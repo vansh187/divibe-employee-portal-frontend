@@ -1,0 +1,13 @@
+# SPA fallback for the built `dist/` output. Without this, reloading a deep
+# link like /leads/42 hits nginx directly and returns a 404 before React
+# Router can handle the route client-side.
+server {
+  listen 80;
+  server_name _;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}

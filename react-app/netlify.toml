@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA fallback: any deep link (e.g. /leads/42) reloaded directly must serve
+# index.html so client-side routing can take over — otherwise the host
+# returns a 404 before React Router ever runs.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
