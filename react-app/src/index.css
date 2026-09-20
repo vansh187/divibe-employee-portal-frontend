@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Fraunces', ui-serif, Georgia, serif;
+  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
+
+  --color-forest-950: #10231b;
+  --color-forest-900: #163024;
+  --color-forest-800: #1c3a2f;
+  --color-forest-700: #234a3a;
+  --color-forest-600: #2c5c48;
+
+  --color-cream-50: #fdfcf9;
+  --color-cream-100: #f7f3ea;
+  --color-cream-200: #efe8d8;
+  --color-cream-300: #e3d9c1;
+
+  --color-gold-400: #d9a95c;
+  --color-gold-500: #c88a3f;
+  --color-gold-600: #ad7530;
+
+  --color-ink-900: #1a1d1b;
+  --color-ink-700: #3f453f;
+  --color-ink-500: #6b7268;
+
+  --color-status-success: #2f7a4f;
+  --color-status-success-bg: #e4f3e9;
+  --color-status-warning: #b8762c;
+  --color-status-warning-bg: #faedd8;
+  --color-status-danger: #b33a3a;
+  --color-status-danger-bg: #fbe6e6;
+  --color-status-info: #2f5f8a;
+  --color-status-info-bg: #e5eef7;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--color-cream-100);
+  color: var(--color-ink-900);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
