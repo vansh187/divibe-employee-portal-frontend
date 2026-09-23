@@ -4,7 +4,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { signup, verifySignupOtp, resendSignupOtp, type SignupInput } from '@/features/auth/api'
-import { useAuthStore } from '@/features/auth/store'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { InlineError } from '@/components/ui/States'
@@ -39,7 +38,6 @@ const RESEND_COOLDOWN_SECONDS = 30
 
 export default function SignupPage() {
   const navigate = useNavigate()
-  const signIn = useAuthStore((s) => s.signIn)
   const [step, setStep] = useState<'details' | 'otp'>('details')
   const [formError, setFormError] = useState<string | null>(null)
   const [pendingEmail, setPendingEmail] = useState('')
@@ -89,9 +87,8 @@ export default function SignupPage() {
   const onSubmitOtp = async (values: OtpValues) => {
     setFormError(null)
     try {
-      const res = await verifySignupOtp({ email: pendingEmail, otp: values.otp })
-      signIn(res)
-      navigate('/dashboard', { replace: true })
+      await verifySignupOtp({ email: pendingEmail, otp: values.otp })
+      navigate('/login', { replace: true, state: { signupVerified: true } })
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Unable to verify this code right now. Please try again.')
     }
@@ -206,7 +203,7 @@ export default function SignupPage() {
                 />
 
                 <Button type="submit" isLoading={otpForm.formState.isSubmitting} className="w-full">
-                  Verify &amp; sign in
+                  Verify email
                 </Button>
 
                 <button

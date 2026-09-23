@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { login } from '@/features/auth/api'
 import { useAuthStore } from '@/features/auth/store'
 import { Input } from '@/components/ui/Input'
@@ -22,6 +22,7 @@ type FormValues = z.infer<typeof schema>
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const signupVerified = (useLocation().state as { signupVerified?: boolean } | null)?.signupVerified
   const signIn = useAuthStore((s) => s.signIn)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -82,6 +83,11 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-ink-500">Access site visits, attendance and your weekly Day Off.</p>
 
           <form className="mt-8 flex flex-col gap-5" onSubmit={handleSubmit(onSubmit)} noValidate>
+            {signupVerified && (
+              <div className="rounded-md border border-status-success/30 bg-status-success-bg px-4 py-3 text-sm text-status-success">
+                Email verified. Sign in with your new account.
+              </div>
+            )}
             {formError && <InlineError message={formError} />}
 
             <Input
