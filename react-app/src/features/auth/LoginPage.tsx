@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { login } from '@/features/auth/api'
 import { useAuthStore } from '@/features/auth/store'
 import { Input } from '@/components/ui/Input'
@@ -124,9 +124,9 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-ink-500">
             New employee?{' '}
-            <a href="#" className="text-gold-600 hover:underline">
-              Request access from your manager
-            </a>
+            <Link to="/signup" className="text-gold-600 hover:underline">
+              Create an account
+            </Link>
           </p>
         </div>
       </main>

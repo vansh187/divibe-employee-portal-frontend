@@ -16,8 +16,27 @@ import { weekKeyFor } from '@/lib/week'
 
 export const CURRENT_EMPLOYEE_ID = 'E-101'
 
+// Mock-only: the domain `Employee` type has no password field since the live API
+// never returns one. Signed-up mock accounts carry one here so login can check it.
+export interface MockEmployee extends Employee {
+  password?: string
+}
+
+// Mock-only: an employee who submitted the signup form but hasn't verified their
+// email OTP yet. Promoted to a real `MockEmployee` on successful verification.
+export interface PendingSignup {
+  email: string
+  name: string
+  employeeCode: string
+  password: string
+  otp: string
+  otpExpiresAt: string
+  createdAt: string
+}
+
 export interface MockDb {
-  employees: Employee[]
+  employees: MockEmployee[]
+  pendingSignups: PendingSignup[]
   projects: Project[]
   properties: PropertyUnit[]
   leads: Lead[]
@@ -39,24 +58,30 @@ function iso(daysFromNow: number, hour = 10, minute = 0): string {
 }
 
 export function buildSeed(): MockDb {
-  const employees: Employee[] = [
+  const employees: MockEmployee[] = [
     {
       id: CURRENT_EMPLOYEE_ID,
+      employeeCode: 'DVI-101',
       name: 'Rohan Kaushik',
       email: 'rohan.kaushik@divinevisioninfra.com',
       designation: 'Site Executive',
       team: 'Field Sales',
       status: 'ACTIVE',
       avatarInitials: 'RK',
+      // Seeded demo accounts accept any non-empty password (see mock login handler)
+      // so this is only set for documentation; signup-created accounts set a real one.
+      password: 'password123',
     },
     {
       id: 'E-102',
+      employeeCode: 'DVI-102',
       name: 'Ananya Verma',
       email: 'ananya.verma@divinevisioninfra.com',
       designation: 'Site Executive',
       team: 'Field Sales',
       status: 'ACTIVE',
       avatarInitials: 'AV',
+      password: 'password123',
     },
   ]
 
@@ -215,6 +240,7 @@ export function buildSeed(): MockDb {
 
   return {
     employees,
+    pendingSignups: [],
     projects,
     properties,
     leads,
