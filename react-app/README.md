@@ -29,7 +29,7 @@ The mock backend persists its state to `localStorage` (`dvi.mockdb.v1`), so data
 - **Switching to the real backend**: copy `.env.example` to `.env.local` and set:
   ```
   VITE_API_MODE=live
-  VITE_API_BASE_URL=<the real base url, once shared>
+  VITE_API_BASE_URL=https://divine-employee-backend.vercel.app/api/v1
   ```
   Nothing else changes — the mock worker doesn't even start in live mode.
 - **Error boundaries**: a global boundary in `App.tsx`, a per-route `errorElement` on every route (`src/app/router.tsx`), and per-widget boundaries on the Dashboard (`WidgetBoundary`) so one broken card never blanks the page.
