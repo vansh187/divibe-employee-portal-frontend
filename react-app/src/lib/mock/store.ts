@@ -5,7 +5,10 @@ const STORAGE_KEY = 'dvi.mockdb.v1'
 function load(): MockDb {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as MockDb
+    if (raw) {
+      // Backfill collections added after this browser first cached its mock data.
+      return { ...buildSeed(), ...(JSON.parse(raw) as Partial<MockDb>) }
+    }
   } catch {
     // fall through to fresh seed
   }
