@@ -114,23 +114,17 @@ export interface VerifySignupOtpInput {
   otp: string
 }
 
-async function verifySignupOtpLive(input: VerifySignupOtpInput): Promise<LoginResponse> {
-  const tokens = await liveFetch<{ access_token: string; refresh_token: string }>('/auth/signup/verify-otp', {
-    method: 'POST',
-    skipAuth: true,
-    body: { email: input.email, otp: input.otp },
-  })
-  useAuthStore.getState().setAccessToken(tokens.access_token)
-  const raw = await liveFetch<LiveEmployeeRaw>('/auth/me')
-  return { accessToken: tokens.access_token, refreshToken: tokens.refresh_token, employee: adaptLiveEmployee(raw) }
-}
-
-function verifySignupOtpMock(input: VerifySignupOtpInput): Promise<LoginResponse> {
-  return apiFetch<LoginResponse>('/auth/signup/verify-otp', { method: 'POST', body: input, skipAuth: true })
-}
-
-export function verifySignupOtp(input: VerifySignupOtpInput): Promise<LoginResponse> {
-  return API_MODE === 'live' ? verifySignupOtpLive(input) : verifySignupOtpMock(input)
+/** Verifies the emailed code and activates the account. Does not sign the user in — they log in afterwards. */
+export async function verifySignupOtp(input: VerifySignupOtpInput): Promise<void> {
+  if (API_MODE === 'live') {
+    await liveFetch<unknown>('/auth/signup/verify-otp', {
+      method: 'POST',
+      skipAuth: true,
+      body: { email: input.email, otp: input.otp },
+    })
+    return
+  }
+  await apiFetch<LoginResponse>('/auth/signup/verify-otp', { method: 'POST', body: input, skipAuth: true })
 }
 
 export function resendSignupOtp(email: string): Promise<SignupStartResult> {
