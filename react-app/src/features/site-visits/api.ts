@@ -1,9 +1,14 @@
 import { apiFetch } from '@/lib/api/client'
-import { liveFetch, liveFetchPaginated, newIdempotencyKey } from '@/lib/api/liveClient'
+import { liveFetch, liveFetchPaginated } from '@/lib/api/liveClient'
 import { API_MODE } from '@/lib/apiMode'
 import type { Lead, Opportunity, Paginated, Project, PropertyUnit, SiteVisit, SiteVisitOutcome } from '@/lib/types/domain'
 
 export interface SiteVisitWithRefs extends SiteVisit {
+  // What was actually typed on THIS visit's form — can differ from the lead's
+  // master name/phone/email for a returning customer (see backend §8).
+  visitorName?: string
+  visitorPhone?: string
+  visitorEmail?: string
   lead?: Lead
   project?: Project
   property?: PropertyUnit
@@ -20,6 +25,9 @@ interface LiveSiteVisitRaw {
   attachments?: string[]
   outcome?: SiteVisitOutcome
   created_at: string
+  visitor_name?: string
+  visitor_phone?: string
+  visitor_email?: string
   lead_name?: string
   project_name?: string
   plot_no?: string
@@ -37,6 +45,9 @@ function adaptLiveSiteVisit(raw: LiveSiteVisitRaw): SiteVisitWithRefs {
     attachments: raw.attachments,
     outcome: raw.outcome,
     createdAt: raw.created_at,
+    visitorName: raw.visitor_name,
+    visitorPhone: raw.visitor_phone,
+    visitorEmail: raw.visitor_email,
     lead: raw.lead_name ? ({ name: raw.lead_name } as Lead) : undefined,
     project: raw.project_name ? ({ name: raw.project_name } as Project) : undefined,
     property: raw.plot_no ? ({ code: raw.plot_no } as PropertyUnit) : undefined,
@@ -67,6 +78,8 @@ export interface CreateSiteVisitInput {
   visitAt: string
   notes?: string
   outcome?: SiteVisitOutcome
+  /** Generated once when the form opens and reused on retry so a resubmit doesn't create a duplicate visit. */
+  idempotencyKey: string
 }
 
 export interface CreateSiteVisitResult {
@@ -94,13 +107,13 @@ function createSiteVisitLive(input: CreateSiteVisitInput): Promise<CreateSiteVis
     body: {
       visitor_name: input.visitorName,
       phone: input.phone,
-      email: input.email,
+      email: input.email || null,
       project_id: input.projectId,
-      property_id: input.propertyId,
+      property_id: input.propertyId || null,
       visit_at: input.visitAt,
       notes: input.notes,
-      outcome: input.outcome,
-      idempotency_key: newIdempotencyKey(),
+      outcome: input.outcome || null,
+      idempotency_key: input.idempotencyKey,
     },
   }).then((raw) => ({
     visit: {

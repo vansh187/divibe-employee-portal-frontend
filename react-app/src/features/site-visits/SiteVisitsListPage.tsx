@@ -67,7 +67,7 @@ export default function SiteVisitsListPage() {
               <li key={v.id} className="flex flex-wrap items-center gap-3 py-3.5">
                 <div className="min-w-0 flex-1">
                   <Link to={`/leads/${v.leadId}`} className="text-sm font-semibold text-ink-900 hover:underline">
-                    {v.lead?.name ?? 'Unknown lead'}
+                    {v.visitorName ?? v.lead?.name ?? 'Unknown lead'}
                   </Link>
                   <p className="text-xs text-ink-500">
                     {v.project?.name} {v.property ? `· ${v.property.code}` : ''} · {formatDateTime(v.visitAt)}

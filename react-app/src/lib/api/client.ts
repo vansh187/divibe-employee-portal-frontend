@@ -4,6 +4,7 @@ import { useAuthStore } from '@/features/auth/store'
 export class ApiError extends Error {
   code: ApiErrorBody['code']
   details?: Record<string, unknown>
+  fields?: ApiErrorBody['fields']
   status: number
 
   constructor(status: number, body: ApiErrorBody) {
@@ -12,6 +13,7 @@ export class ApiError extends Error {
     this.status = status
     this.code = body.code
     this.details = body.details
+    this.fields = body.fields
   }
 }
 
