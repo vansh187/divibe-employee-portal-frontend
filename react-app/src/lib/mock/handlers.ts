@@ -2,6 +2,7 @@ import { http, HttpResponse, delay } from 'msw'
 import { getDb, saveDb, nextId } from '@/lib/mock/store'
 import { weekKeyFor } from '@/lib/week'
 import { LOCK_WINDOW_DAYS } from '@/lib/constants'
+import type { MockEmployee } from '@/lib/mock/seed'
 import type {
   ApiErrorBody,
   AttendanceRecord,
@@ -50,9 +51,107 @@ export const handlers = [
     const body = (await request.json()) as { email: string; password: string }
     const db = getDb()
     const employee = db.employees.find((e) => e.email.toLowerCase() === body.email?.toLowerCase())
-    if (!employee || !body.password) {
+    // Seeded demo accounts have a password on record but accept any non-empty value;
+    // signup-created accounts must match exactly.
+    const passwordOk = !!body.password && (!employee?.password || employee.password === body.password)
+    if (!employee || !passwordOk) {
       return err(401, { code: 'UNAUTHORIZED', message: 'Invalid work email or password.' })
     }
+    const accessToken = `mock-access-${employee.id}-${Date.now()}`
+    const refreshToken = `mock-refresh-${employee.id}-${Date.now()}`
+    return HttpResponse.json({ accessToken, refreshToken, employee })
+  }),
+
+  // ---------- Signup (email OTP verification) ----------
+  http.post(`${API}/auth/signup`, async ({ request }) => {
+    await delay(LATENCY)
+    const body = (await request.json()) as { name: string; email: string; employeeId: string; password: string }
+    const db = getDb()
+    const email = body.email?.trim().toLowerCase()
+
+    if (!body.name?.trim() || !email || !body.employeeId?.trim() || !body.password || body.password.length < 8) {
+      return err(422, { code: 'VALIDATION_FAILED', message: 'Please fill in every field. Password must be at least 8 characters.' })
+    }
+    if (db.employees.some((e) => e.email.toLowerCase() === email)) {
+      return err(409, { code: 'EMAIL_ALREADY_REGISTERED', message: 'An account with this email already exists.' })
+    }
+    if (db.employees.some((e) => e.employeeCode?.toLowerCase() === body.employeeId.trim().toLowerCase())) {
+      return err(409, { code: 'EMPLOYEE_ID_ALREADY_REGISTERED', message: 'This Employee ID is already registered.' })
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000))
+    const expiresAt = new Date()
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10)
+
+    db.pendingSignups = db.pendingSignups.filter((p) => p.email !== email)
+    db.pendingSignups.push({
+      email,
+      name: body.name.trim(),
+      employeeCode: body.employeeId.trim(),
+      password: body.password,
+      otp,
+      otpExpiresAt: expiresAt.toISOString(),
+      createdAt: new Date().toISOString(),
+    })
+    saveDb()
+
+    // No real mailbox in mock mode — the OTP is echoed back so the form can show it.
+    // eslint-disable-next-line no-console
+    console.info(`[mock] Signup OTP for ${email}: ${otp}`)
+    return HttpResponse.json({ email, devOtp: otp, expiresAt: expiresAt.toISOString() }, { status: 201 })
+  }),
+
+  http.post(`${API}/auth/signup/resend-otp`, async ({ request }) => {
+    await delay(LATENCY)
+    const body = (await request.json()) as { email: string }
+    const db = getDb()
+    const email = body.email?.trim().toLowerCase()
+    const pending = db.pendingSignups.find((p) => p.email === email)
+    if (!pending) return err(404, { code: 'NOT_FOUND', message: 'Start the signup form again — this session expired.' })
+
+    pending.otp = String(Math.floor(100000 + Math.random() * 900000))
+    const expiresAt = new Date()
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10)
+    pending.otpExpiresAt = expiresAt.toISOString()
+    saveDb()
+
+    // eslint-disable-next-line no-console
+    console.info(`[mock] Resent signup OTP for ${email}: ${pending.otp}`)
+    return HttpResponse.json({ email, devOtp: pending.otp, expiresAt: pending.otpExpiresAt })
+  }),
+
+  http.post(`${API}/auth/signup/verify-otp`, async ({ request }) => {
+    await delay(LATENCY)
+    const body = (await request.json()) as { email: string; otp: string }
+    const db = getDb()
+    const email = body.email?.trim().toLowerCase()
+    const pending = db.pendingSignups.find((p) => p.email === email)
+    if (!pending) return err(404, { code: 'NOT_FOUND', message: 'Start the signup form again — this session expired.' })
+    if (new Date(pending.otpExpiresAt) < new Date()) {
+      return err(410, { code: 'OTP_EXPIRED', message: 'This code has expired. Request a new one.' })
+    }
+    if (pending.otp !== body.otp?.trim()) {
+      return err(422, { code: 'INVALID_OTP', message: 'That code is incorrect. Please check and try again.' })
+    }
+
+    const employee: MockEmployee = {
+      id: nextId('E'),
+      employeeCode: pending.employeeCode,
+      name: pending.name,
+      email: pending.email,
+      status: 'ACTIVE',
+      avatarInitials: pending.name
+        .split(/\s+/)
+        .map((p) => p[0])
+        .slice(0, 2)
+        .join('')
+        .toUpperCase(),
+      password: pending.password,
+    }
+    db.employees.push(employee)
+    db.pendingSignups = db.pendingSignups.filter((p) => p.email !== email)
+    saveDb()
+
     const accessToken = `mock-access-${employee.id}-${Date.now()}`
     const refreshToken = `mock-refresh-${employee.id}-${Date.now()}`
     return HttpResponse.json({ accessToken, refreshToken, employee })

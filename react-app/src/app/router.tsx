@@ -4,6 +4,7 @@ import { RouteErrorBoundary } from '@/components/errors/AppErrorFallback'
 import NotFoundPage from '@/components/ui/NotFoundPage'
 import AppShell from '@/layouts/AppShell'
 import LoginPage from '@/features/auth/LoginPage'
+import SignupPage from '@/features/auth/SignupPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import LeadsListPage from '@/features/leads/LeadsListPage'
 import LeadDetailPage from '@/features/leads/LeadDetailPage'
@@ -19,6 +20,11 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: '/signup',
+    element: <SignupPage />,
     errorElement: <RouteErrorBoundary />,
   },
   {
