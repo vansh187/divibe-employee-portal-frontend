@@ -14,6 +14,7 @@ import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { InlineError } from '@/components/ui/States'
 import { ApiError } from '@/lib/api/client'
+import type { PropertyUnit } from '@/lib/types/domain'
 import { CONFLICT_MESSAGES } from '@/lib/constants'
 
 // The live API is in IST; build visit_at as one local value with the India offset
@@ -22,12 +23,15 @@ function toVisitAt(dateInput: string, timeInput: string): string {
   return `${dateInput}T${timeInput}:00+05:30`
 }
 
+// LOCKED (reserved) plots stay selectable — the API makes the final call and returns PROPERTY_LOCKED.
+const isBookable = (p: PropertyUnit) => p.availability !== 'SOLD' && p.availability !== 'DEAL_LOCKED'
+
 const schema = z.object({
   visitorName: z.string().min(1, 'Visitor name is required'),
   phone: z.string().min(6, 'Enter a valid phone number'),
   email: z.union([z.string().email('Enter a valid email'), z.literal('')]).optional(),
   projectId: z.string().min(1, 'Select a project/site'),
-  propertyId: z.string().optional(),
+  plotNo: z.string().optional(),
   visitDate: z.string().min(1, 'Visit date is required'),
   visitTime: z.string().min(1, 'Visit time is required'),
   notes: z.string().optional(),
@@ -63,6 +67,7 @@ export default function NewSiteVisitPage() {
     control,
     watch,
     setError,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -73,11 +78,17 @@ export default function NewSiteVisitPage() {
   })
 
   const projectId = watch('projectId')
-  const { data: properties, isLoading: propertiesLoading } = useQuery({
+  const {
+    data: properties,
+    isLoading: propertiesLoading,
+    isError: propertiesError,
+  } = useQuery({
     queryKey: ['properties', projectId],
     queryFn: () => fetchProperties(projectId),
     enabled: !!projectId,
   })
+
+  const bookablePlots = (properties ?? []).filter(isBookable)
 
   const mutation = useMutation({
     mutationFn: createSiteVisit,
@@ -105,12 +116,35 @@ export default function NewSiteVisitPage() {
 
   const onSubmit = (values: FormValues) => {
     setConflict(null)
+
+    let propertyId: string | undefined
+    const typedPlot = values.plotNo?.trim()
+    if (typedPlot) {
+      const norm = (v: string) => v.replace(/\s+/g, '').replace(/^plot/i, '').toLowerCase()
+      if (!properties) {
+        setError('plotNo', {
+          message: propertiesError ? "Couldn't load this project's plots. Please try again." : 'Plots are still loading. Please wait a moment.',
+        })
+        return
+      }
+      const match = properties.find((p) => norm(p.code) === norm(typedPlot))
+      if (!match) {
+        setError('plotNo', { message: 'No such plot in this project. Pick one from the suggestions.' })
+        return
+      }
+      if (!isBookable(match)) {
+        setError('plotNo', { message: 'This plot is no longer available.' })
+        return
+      }
+      propertyId = match.id
+    }
+
     mutation.mutate({
       visitorName: values.visitorName,
       phone: values.phone,
       email: values.email || undefined,
       projectId: values.projectId,
-      propertyId: values.propertyId || undefined,
+      propertyId,
       visitAt: toVisitAt(values.visitDate, values.visitTime),
       notes: values.notes || undefined,
       outcome: (values.outcome || undefined) as CreateSiteVisitInput['outcome'],
@@ -149,7 +183,16 @@ export default function NewSiteVisitPage() {
               control={control}
               name="projectId"
               render={({ field }) => (
-                <Select label="Project / Site" error={errors.projectId?.message} disabled={projectsLoading} {...field}>
+                <Select
+                  label="Project / Site"
+                  error={errors.projectId?.message}
+                  disabled={projectsLoading}
+                  {...field}
+                  onChange={(e) => {
+                    field.onChange(e)
+                    setValue('plotNo', '')
+                  }}
+                >
                   <option value="">Select a project</option>
                   {projects?.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -159,23 +202,25 @@ export default function NewSiteVisitPage() {
                 </Select>
               )}
             />
-            <Controller
-              control={control}
-              name="propertyId"
-              render={({ field }) => (
-                <Select label="Unit / Plot (optional)" disabled={!projectId || propertiesLoading} {...field}>
-                  <option value="">No specific plot</option>
-                  {properties
-                    ?.filter((p) => p.availability !== 'SOLD' && p.availability !== 'DEAL_LOCKED')
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.code}
-                        {p.availability === 'LOCKED' ? ' (reserved)' : ''}
-                      </option>
-                    ))}
-                </Select>
-              )}
-            />
+            <div>
+              <Input
+                label="Unit / Plot (optional)"
+                placeholder={projectId ? 'Type plot number' : 'Select a project first'}
+                list="plot-suggestions"
+                autoComplete="off"
+                disabled={!projectId || propertiesLoading}
+                error={errors.plotNo?.message}
+                {...register('plotNo')}
+              />
+              <datalist id="plot-suggestions">
+                {bookablePlots.map((p) => (
+                  <option key={p.id} value={p.code}>
+                    {p.areaSqft ? `${p.areaSqft} sq ft` : ''}
+                    {p.availability === 'LOCKED' ? ' (reserved)' : ''}
+                  </option>
+                ))}
+              </datalist>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

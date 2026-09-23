@@ -18,6 +18,7 @@ interface LivePlotRaw {
   id: string
   project_id: string
   plot_no: string
+  area_sqft?: number
   status: PropertyAvailability
 }
 
@@ -26,7 +27,7 @@ function adaptLiveProject(raw: LiveProjectRaw): Project {
 }
 
 function adaptLivePlot(raw: LivePlotRaw): PropertyUnit {
-  return { id: raw.id, projectId: raw.project_id, code: raw.plot_no, availability: raw.status }
+  return { id: raw.id, projectId: raw.project_id, code: raw.plot_no, areaSqft: raw.area_sqft, availability: raw.status }
 }
 
 export function fetchProjects(): Promise<Project[]> {
