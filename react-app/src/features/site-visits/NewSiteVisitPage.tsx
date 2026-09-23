@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,6 +15,12 @@ import { Button } from '@/components/ui/Button'
 import { InlineError } from '@/components/ui/States'
 import { ApiError } from '@/lib/api/client'
 import { CONFLICT_MESSAGES } from '@/lib/constants'
+
+// The live API is in IST; build visit_at as one local value with the India offset
+// instead of converting to UTC, so a browser in another timezone can't shift the visit's date.
+function toVisitAt(dateInput: string, timeInput: string): string {
+  return `${dateInput}T${timeInput}:00+05:30`
+}
 
 const schema = z.object({
   visitorName: z.string().min(1, 'Visitor name is required'),
@@ -45,6 +51,9 @@ export default function NewSiteVisitPage() {
   const queryClient = useQueryClient()
   const employee = useAuthStore((s) => s.employee)
   const [conflict, setConflict] = useState<{ code: string; message: string } | null>(null)
+  // Generated once when the form opens; reused on retry (e.g. CONCURRENT_UPDATE) so a resubmit
+  // doesn't create a duplicate visit.
+  const idempotencyKeyRef = useRef(crypto.randomUUID())
 
   const { data: projects, isLoading: projectsLoading } = useQuery({ queryKey: ['projects'], queryFn: fetchProjects })
 
@@ -53,6 +62,7 @@ export default function NewSiteVisitPage() {
     handleSubmit,
     control,
     watch,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -77,13 +87,19 @@ export default function NewSiteVisitPage() {
       navigate(`/leads/${result.lead.id}`, { state: { justLogged: true } })
     },
     onError: (err) => {
-      if (err instanceof ApiError && ['DAY_OFF_CONFLICT', 'LEAD_LOCKED', 'PROPERTY_LOCKED'].includes(err.code)) {
-        setConflict({ code: err.code, message: CONFLICT_MESSAGES[err.code] ?? err.message })
-      } else if (err instanceof ApiError) {
-        setConflict({ code: err.code, message: err.message })
-      } else {
+      if (!(err instanceof ApiError)) {
         setConflict({ code: 'SERVER_ERROR', message: 'Unable to log this visit right now. Please try again.' })
+        return
       }
+
+      const emailFieldError = err.fields?.find((f) => f.field === 'body.email' || f.field === 'email')
+      if (emailFieldError) {
+        setError('email', { message: 'Enter a valid email address' })
+      }
+
+      if (err.code === 'VALIDATION_FAILED' && emailFieldError) return
+
+      setConflict({ code: err.code, message: CONFLICT_MESSAGES[err.code] ?? err.message })
     },
   })
 
@@ -95,9 +111,10 @@ export default function NewSiteVisitPage() {
       email: values.email || undefined,
       projectId: values.projectId,
       propertyId: values.propertyId || undefined,
-      visitAt: new Date(`${values.visitDate}T${values.visitTime}`).toISOString(),
+      visitAt: toVisitAt(values.visitDate, values.visitTime),
       notes: values.notes || undefined,
       outcome: (values.outcome || undefined) as CreateSiteVisitInput['outcome'],
+      idempotencyKey: idempotencyKeyRef.current,
     })
   }
 
@@ -148,11 +165,14 @@ export default function NewSiteVisitPage() {
               render={({ field }) => (
                 <Select label="Unit / Plot (optional)" disabled={!projectId || propertiesLoading} {...field}>
                   <option value="">No specific plot</option>
-                  {properties?.map((p) => (
-                    <option key={p.id} value={p.id} disabled={p.availability === 'SOLD' || p.availability === 'DEAL_LOCKED'}>
-                      {p.code} — {p.availability}
-                    </option>
-                  ))}
+                  {properties
+                    ?.filter((p) => p.availability !== 'SOLD' && p.availability !== 'DEAL_LOCKED')
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.code}
+                        {p.availability === 'LOCKED' ? ' (reserved)' : ''}
+                      </option>
+                    ))}
                 </Select>
               )}
             />

@@ -6,6 +6,8 @@ export const CONFLICT_MESSAGES: Record<string, string> = {
   DAY_OFF_CONFLICT: 'This date is your frozen Day Off. Site visits cannot be logged on a Day Off.',
   LEAD_LOCKED: 'This lead is currently locked to another employee. It will release automatically if no qualifying action is taken.',
   PROPERTY_LOCKED: 'This plot/property is currently locked to another employee for this lead.',
+  OPPORTUNITY_CONFLICT: 'This customer and plot were just claimed by someone else.',
+  CONCURRENT_UPDATE: 'Please try again.',
 }
 
 export const ATTENDANCE_STATUS_LABEL: Record<AttendanceStatus, string> = {
