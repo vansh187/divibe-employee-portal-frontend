@@ -44,11 +44,16 @@ function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 
 
 interface OpportunityCardProps {
   opportunity: Opportunity
-  onStatusChange: (opportunityId: string, status: OpportunityStatus) => void
+  onSubmitStatus: (opportunityId: string, status: OpportunityStatus) => void
   isLoading?: boolean
+  justUpdated?: boolean
+  justFailed?: boolean
 }
 
-function OpportunityCard({ opportunity, onStatusChange, isLoading }: OpportunityCardProps) {
+function OpportunityCard({ opportunity, onSubmitStatus, isLoading, justUpdated, justFailed }: OpportunityCardProps) {
+  const [selectedStatus, setSelectedStatus] = useState<OpportunityStatus>(opportunity.status)
+  const hasChange = selectedStatus !== opportunity.status
+
   return (
     <div className="rounded-md border border-forest-800/10 bg-forest-800/2 p-3">
       <div className="flex flex-col gap-3 text-sm">
@@ -66,8 +71,8 @@ function OpportunityCard({ opportunity, onStatusChange, isLoading }: Opportunity
           <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Change Status</label>
           <div className="mt-2 flex items-center gap-2">
             <Select
-              value={opportunity.status}
-              onChange={(e) => onStatusChange(opportunity.id, e.target.value as OpportunityStatus)}
+              value={selectedStatus}
+              onChange={(e) => setSelectedStatus(e.target.value as OpportunityStatus)}
               disabled={isLoading}
             >
               {OPPORTUNITY_STATUS_OPTIONS.map((o) => (
@@ -76,8 +81,29 @@ function OpportunityCard({ opportunity, onStatusChange, isLoading }: Opportunity
                 </option>
               ))}
             </Select>
+            <Button
+              size="sm"
+              onClick={() => onSubmitStatus(opportunity.id, selectedStatus)}
+              disabled={!hasChange}
+              isLoading={isLoading}
+            >
+              Submit
+            </Button>
           </div>
         </div>
+
+        {justUpdated && (
+          <div className="rounded-md border border-status-success/30 bg-status-success-bg px-3 py-2 text-xs text-status-success">
+            Deal updated — status is now{' '}
+            <span className="font-semibold">{OPPORTUNITY_STATUS_OPTIONS.find((o) => o.value === opportunity.status)?.label}</span>.
+          </div>
+        )}
+
+        {justFailed && (
+          <div className="rounded-md border border-status-danger/30 bg-status-danger-bg px-3 py-2 text-xs text-status-danger">
+            Couldn't update status. Please try again.
+          </div>
+        )}
       </div>
     </div>
   )
@@ -104,15 +130,33 @@ export default function LeadDetailPage() {
     },
   })
 
+  const [pendingOpportunityId, setPendingOpportunityId] = useState<string | null>(null)
+  const [justUpdatedOpportunityId, setJustUpdatedOpportunityId] = useState<string | null>(null)
+  const [failedOpportunityId, setFailedOpportunityId] = useState<string | null>(null)
+
   const statusMutation = useMutation({
     mutationFn: (payload: { opportunityId: string; status: OpportunityStatus }) => {
       return updateOpportunityStatus(payload.opportunityId, payload.status)
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['lead', leadId] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      setJustUpdatedOpportunityId(variables.opportunityId)
+    },
+    onError: (_error, variables) => {
+      setFailedOpportunityId(variables.opportunityId)
+    },
+    onSettled: () => {
+      setPendingOpportunityId(null)
     },
   })
+
+  const handleSubmitStatus = (opportunityId: string, status: OpportunityStatus) => {
+    setJustUpdatedOpportunityId(null)
+    setFailedOpportunityId(null)
+    setPendingOpportunityId(opportunityId)
+    statusMutation.mutate({ opportunityId, status })
+  }
 
   if (isLoading) return <PageLoading label="Loading lead…" />
   if (error) return <InlineError message={error instanceof ApiError ? error.message : 'Failed to load this lead.'} />
@@ -164,8 +208,10 @@ export default function LeadDetailPage() {
                   <OpportunityCard
                     key={opp.id}
                     opportunity={opp}
-                    onStatusChange={(oppId, status) => statusMutation.mutate({ opportunityId: oppId, status })}
-                    isLoading={statusMutation.isPending}
+                    onSubmitStatus={handleSubmitStatus}
+                    isLoading={pendingOpportunityId === opp.id}
+                    justUpdated={justUpdatedOpportunityId === opp.id}
+                    justFailed={failedOpportunityId === opp.id}
                   />
                 ))}
               </div>
