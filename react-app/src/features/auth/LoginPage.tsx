@@ -59,18 +59,8 @@ export default function LoginPage() {
           </h1>
 
           <div className="mt-10 border-t border-cream-100/15 pt-6">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-cream-100/70">Active developments</span>
-              <span className="font-mono text-gold-400">03</span>
-            </div>
-            <div className="mt-4 flex items-center justify-between text-sm">
-              <span className="text-cream-100/85">OPS Divine Greens · Karnal</span>
-              <span className="font-mono text-gold-400">369 plots</span>
-            </div>
-            <div className="mt-2 flex items-center justify-between text-sm">
-              <span className="text-cream-100/85">Suraksha Enclave · Ganaur</span>
-              <span className="font-mono text-gold-400">Phase 2</span>
-            </div>
+            <p className="text-sm text-cream-100/85">OPS Divine Greens · Karnal</p>
+            <p className="mt-2 text-sm text-cream-100/85">Suraksha Enclave · Ganaur</p>
           </div>
         </div>
 
