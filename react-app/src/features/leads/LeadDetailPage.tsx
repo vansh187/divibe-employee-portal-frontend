@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { fetchLeadDetail, addFollowUp } from '@/features/leads/api'
+import { fetchLeadDetail, addFollowUp, updateOpportunityStatus } from '@/features/leads/api'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -10,7 +10,7 @@ import { Select } from '@/components/ui/Select'
 import { PageLoading, InlineError, EmptyState } from '@/components/ui/States'
 import { formatDateTime, formatRemaining } from '@/lib/format'
 import { ApiError } from '@/lib/api/client'
-import type { FollowUpAction } from '@/lib/types/domain'
+import type { FollowUpAction, OpportunityStatus } from '@/lib/types/domain'
 
 // Only these three renew the 3-day lock (spec §5) — a plain NOTE does not.
 const FOLLOW_UP_OPTIONS: { value: FollowUpAction['actionType']; label: string; qualifying: boolean }[] = [
@@ -19,6 +19,27 @@ const FOLLOW_UP_OPTIONS: { value: FollowUpAction['actionType']; label: string; q
   { value: 'PROPOSAL_SENT', label: 'Proposal/quotation sent', qualifying: true },
   { value: 'NOTE', label: 'Note (does not extend your hold)', qualifying: false },
 ]
+
+const OPPORTUNITY_STATUS_OPTIONS: { value: OpportunityStatus; label: string }[] = [
+  { value: 'ACTIVE', label: 'In Progress' },
+  { value: 'CONVERTED', label: 'Deal Closed' },
+  { value: 'LOST', label: 'Lost' },
+  { value: 'EXPIRED', label: 'Expired' },
+]
+
+function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 'danger' | 'info' {
+  switch (status) {
+    case 'ACTIVE':
+      return 'info'
+    case 'CONVERTED':
+      return 'success'
+    case 'LOST':
+    case 'EXPIRED':
+      return 'danger'
+    default:
+      return 'warning'
+  }
+}
 
 export default function LeadDetailPage() {
   const { leadId = '' } = useParams()
@@ -35,6 +56,17 @@ export default function LeadDetailPage() {
 
   const mutation = useMutation({
     mutationFn: () => addFollowUp(leadId, { actionType }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lead', leadId] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: (status: OpportunityStatus) => {
+      if (!data?.opportunity?.id) throw new Error('No opportunity found')
+      return updateOpportunityStatus(data.opportunity.id, status)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lead', leadId] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
@@ -80,11 +112,32 @@ export default function LeadDetailPage() {
         <Card>
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Opportunity</p>
           {opportunity ? (
-            <div className="mt-2 flex flex-col gap-1 text-sm">
-              <span className="text-ink-900">
-                Source: <span className="font-semibold">{opportunity.sourceOwnerType.replace('_', ' ')}</span>
-              </span>
-              <span className="text-ink-500">Status: {opportunity.status.replace('_', ' ')}</span>
+            <div className="mt-2 flex flex-col gap-3 text-sm">
+              <div>
+                <span className="text-ink-900">
+                  Source: <span className="font-semibold">{opportunity.sourceOwnerType.replace('_', ' ')}</span>
+                </span>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Status</label>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={opportunity.status}
+                    onChange={(e) => statusMutation.mutate(e.target.value as OpportunityStatus)}
+                    disabled={statusMutation.isPending}
+                  >
+                    {OPPORTUNITY_STATUS_OPTIONS.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </Select>
+                  <Badge tone={getStatusBadgeTone(opportunity.status)}>{OPPORTUNITY_STATUS_OPTIONS.find((o) => o.value === opportunity.status)?.label}</Badge>
+                </div>
+              </div>
+              {statusMutation.isError && (
+                <div className="text-xs text-status-danger">Failed to update status.</div>
+              )}
             </div>
           ) : (
             <p className="mt-2 text-sm text-ink-500">No opportunity recorded yet.</p>

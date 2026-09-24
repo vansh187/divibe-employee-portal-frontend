@@ -318,6 +318,19 @@ export const handlers = [
     return HttpResponse.json(followUp, { status: 201 })
   }),
 
+  http.put(`${API}/opportunities/:opportunityId`, async ({ request, params }) => {
+    await delay(LATENCY)
+    const employeeId = requireAuth(request)
+    if (!employeeId) return err(401, { code: 'UNAUTHORIZED', message: 'Not authenticated.' })
+    const db = getDb()
+    const opportunity = db.opportunities.find((o) => o.id === params.opportunityId)
+    if (!opportunity) return err(404, { code: 'NOT_FOUND', message: 'Opportunity not found.' })
+    const body = (await request.json()) as { status: Opportunity['status'] }
+    opportunity.status = body.status
+    saveDb()
+    return HttpResponse.json(opportunity)
+  }),
+
   // ---------- Site Visits ----------
   http.get(`${API}/site-visits`, async ({ request }) => {
     await delay(LATENCY)

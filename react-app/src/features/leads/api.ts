@@ -166,3 +166,29 @@ export function addFollowUp(
 ): Promise<FollowUpAction> {
   return API_MODE === 'live' ? addFollowUpLive(leadId, input) : addFollowUpMock(leadId, input)
 }
+
+// ---- Opportunities ----
+
+function updateOpportunityStatusLive(
+  opportunityId: string,
+  status: Opportunity['status'],
+): Promise<Opportunity> {
+  return liveFetch<Opportunity>(`/opportunities/${opportunityId}`, {
+    method: 'PUT',
+    body: { status },
+  })
+}
+
+function updateOpportunityStatusMock(
+  opportunityId: string,
+  status: Opportunity['status'],
+): Promise<Opportunity> {
+  return apiFetch<Opportunity>(`/opportunities/${opportunityId}`, { method: 'PUT', body: { status } })
+}
+
+export function updateOpportunityStatus(
+  opportunityId: string,
+  status: Opportunity['status'],
+): Promise<Opportunity> {
+  return API_MODE === 'live' ? updateOpportunityStatusLive(opportunityId, status) : updateOpportunityStatusMock(opportunityId, status)
+}
