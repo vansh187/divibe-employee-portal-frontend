@@ -135,7 +135,7 @@ interface LiveActiveLockRaw {
  * flag this to the backend team if lead detail needs richer data in one call.
  */
 async function fetchLeadDetailLive(leadId: string): Promise<LeadDetail> {
-  const leadRaw = await liveFetch<{ data: LiveLeadRaw }>(`/api/v1/leads/${leadId}`).then((r) => r.data)
+  const leadRaw = await liveFetch<LiveLeadRaw>(`/leads/${leadId}`)
   const lead = adaptLiveLead(leadRaw)
 
   const followUpsRaw = await liveFetch<LiveFollowUpRaw[]>(`/leads/${leadId}/follow-ups`).catch(() => [] as LiveFollowUpRaw[])
