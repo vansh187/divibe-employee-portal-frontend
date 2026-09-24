@@ -44,10 +44,11 @@ function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 
 
 interface OpportunityCardProps {
   opportunity: Opportunity
-  statusMutation: ReturnType<typeof useMutation<Opportunity, Error, OpportunityStatus>>
+  onStatusChange: (opportunityId: string, status: OpportunityStatus) => void
+  isLoading?: boolean
 }
 
-function OpportunityCard({ opportunity, statusMutation }: OpportunityCardProps) {
+function OpportunityCard({ opportunity, onStatusChange, isLoading }: OpportunityCardProps) {
   return (
     <div className="rounded-md border border-forest-800/10 bg-forest-800/2 p-3">
       <div className="flex flex-col gap-3 text-sm">
@@ -66,8 +67,8 @@ function OpportunityCard({ opportunity, statusMutation }: OpportunityCardProps) 
           <div className="mt-2 flex items-center gap-2">
             <Select
               value={opportunity.status}
-              onChange={(e) => statusMutation.mutate({ opportunityId: opportunity.id, status: e.target.value as OpportunityStatus })}
-              disabled={statusMutation.isPending}
+              onChange={(e) => onStatusChange(opportunity.id, e.target.value as OpportunityStatus)}
+              disabled={isLoading}
             >
               {OPPORTUNITY_STATUS_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -77,10 +78,6 @@ function OpportunityCard({ opportunity, statusMutation }: OpportunityCardProps) 
             </Select>
           </div>
         </div>
-
-        {statusMutation.isError && (
-          <div className="text-xs text-status-danger">Failed to update status.</div>
-        )}
       </div>
     </div>
   )
@@ -164,7 +161,12 @@ export default function LeadDetailPage() {
             ) : (
               <div className="mt-3 space-y-4">
                 {opportunities.map((opp) => (
-                  <OpportunityCard key={opp.id} opportunity={opp} statusMutation={statusMutation} />
+                  <OpportunityCard
+                    key={opp.id}
+                    opportunity={opp}
+                    onStatusChange={(oppId, status) => statusMutation.mutate({ opportunityId: oppId, status })}
+                    isLoading={statusMutation.isPending}
+                  />
                 ))}
               </div>
             )}
