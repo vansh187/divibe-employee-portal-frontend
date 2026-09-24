@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchLeadDetail, addFollowUp, updateOpportunityStatus } from '@/features/leads/api'
+import type { SettableOpportunityStatus } from '@/features/leads/api'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -21,11 +22,23 @@ const FOLLOW_UP_OPTIONS: { value: FollowUpAction['actionType']; label: string; q
   { value: 'NOTE', label: 'Note (does not extend your hold)', qualifying: false },
 ]
 
-const OPPORTUNITY_STATUS_OPTIONS: { value: OpportunityStatus; label: string }[] = [
-  { value: 'ACTIVE', label: 'In Progress' },
+// Full set, for the read-only status badge (ACTIVE/EXPIRED/ATTRIBUTION_CONFLICT
+// are backend-derived and can't be set by the employee).
+const OPPORTUNITY_STATUS_LABELS: Record<OpportunityStatus, string> = {
+  ACTIVE: 'In Progress',
+  CONVERTED: 'Deal Closed',
+  LOST: 'Lost',
+  EXPIRED: 'Expired',
+  RELEASED: 'Released',
+  ATTRIBUTION_CONFLICT: 'Attribution Conflict',
+}
+
+// Only these are settable via POST /opportunities/{id}/status, and only when
+// the opportunity is currently ACTIVE.
+const SETTABLE_STATUS_OPTIONS: { value: SettableOpportunityStatus; label: string }[] = [
   { value: 'CONVERTED', label: 'Deal Closed' },
   { value: 'LOST', label: 'Lost' },
-  { value: 'EXPIRED', label: 'Expired' },
+  { value: 'RELEASED', label: 'Release Lock' },
 ]
 
 function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 'danger' | 'info' {
@@ -44,15 +57,15 @@ function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 
 
 interface OpportunityCardProps {
   opportunity: Opportunity
-  onSubmitStatus: (opportunityId: string, status: OpportunityStatus) => void
+  onSubmitStatus: (opportunityId: string, status: SettableOpportunityStatus) => void
   isLoading?: boolean
   justUpdated?: boolean
-  justFailed?: boolean
+  failureMessage?: string | null
 }
 
-function OpportunityCard({ opportunity, onSubmitStatus, isLoading, justUpdated, justFailed }: OpportunityCardProps) {
-  const [selectedStatus, setSelectedStatus] = useState<OpportunityStatus>(opportunity.status)
-  const hasChange = selectedStatus !== opportunity.status
+function OpportunityCard({ opportunity, onSubmitStatus, isLoading, justUpdated, failureMessage }: OpportunityCardProps) {
+  const [selectedStatus, setSelectedStatus] = useState<SettableOpportunityStatus>('CONVERTED')
+  const canChangeStatus = opportunity.status === 'ACTIVE'
 
   return (
     <div className="rounded-md border border-forest-800/10 bg-forest-800/2 p-3">
@@ -62,46 +75,44 @@ function OpportunityCard({ opportunity, onSubmitStatus, isLoading, justUpdated, 
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Source</p>
             <p className="mt-1 text-ink-900">{opportunity.sourceOwnerType.replace('_', ' ')}</p>
           </div>
-          <Badge tone={getStatusBadgeTone(opportunity.status)}>
-            {OPPORTUNITY_STATUS_OPTIONS.find((o) => o.value === opportunity.status)?.label}
-          </Badge>
+          <Badge tone={getStatusBadgeTone(opportunity.status)}>{OPPORTUNITY_STATUS_LABELS[opportunity.status]}</Badge>
         </div>
 
-        <div className="border-t border-forest-800/10 pt-3">
-          <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Change Status</label>
-          <div className="mt-2 flex items-center gap-2">
-            <Select
-              value={selectedStatus}
-              onChange={(e) => setSelectedStatus(e.target.value as OpportunityStatus)}
-              disabled={isLoading}
-            >
-              {OPPORTUNITY_STATUS_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </Select>
-            <Button
-              size="sm"
-              onClick={() => onSubmitStatus(opportunity.id, selectedStatus)}
-              disabled={!hasChange}
-              isLoading={isLoading}
-            >
-              Submit
-            </Button>
+        {canChangeStatus ? (
+          <div className="border-t border-forest-800/10 pt-3">
+            <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Change Status</label>
+            <div className="mt-2 flex items-center gap-2">
+              <Select
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value as SettableOpportunityStatus)}
+                disabled={isLoading}
+              >
+                {SETTABLE_STATUS_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+              <Button size="sm" onClick={() => onSubmitStatus(opportunity.id, selectedStatus)} isLoading={isLoading}>
+                Submit
+              </Button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <p className="border-t border-forest-800/10 pt-3 text-xs text-ink-500">
+            This opportunity is {OPPORTUNITY_STATUS_LABELS[opportunity.status].toLowerCase()} and can no longer be changed.
+          </p>
+        )}
 
         {justUpdated && (
           <div className="rounded-md border border-status-success/30 bg-status-success-bg px-3 py-2 text-xs text-status-success">
-            Deal updated — status is now{' '}
-            <span className="font-semibold">{OPPORTUNITY_STATUS_OPTIONS.find((o) => o.value === opportunity.status)?.label}</span>.
+            Deal updated — status is now <span className="font-semibold">{OPPORTUNITY_STATUS_LABELS[opportunity.status]}</span>.
           </div>
         )}
 
-        {justFailed && (
+        {failureMessage && (
           <div className="rounded-md border border-status-danger/30 bg-status-danger-bg px-3 py-2 text-xs text-status-danger">
-            Couldn't update status. Please try again.
+            {failureMessage}
           </div>
         )}
       </div>
@@ -132,10 +143,10 @@ export default function LeadDetailPage() {
 
   const [pendingOpportunityId, setPendingOpportunityId] = useState<string | null>(null)
   const [justUpdatedOpportunityId, setJustUpdatedOpportunityId] = useState<string | null>(null)
-  const [failedOpportunityId, setFailedOpportunityId] = useState<string | null>(null)
+  const [failedOpportunity, setFailedOpportunity] = useState<{ id: string; message: string } | null>(null)
 
   const statusMutation = useMutation({
-    mutationFn: (payload: { opportunityId: string; status: OpportunityStatus }) => {
+    mutationFn: (payload: { opportunityId: string; status: SettableOpportunityStatus }) => {
       return updateOpportunityStatus(payload.opportunityId, payload.status)
     },
     onSuccess: (_data, variables) => {
@@ -143,17 +154,18 @@ export default function LeadDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       setJustUpdatedOpportunityId(variables.opportunityId)
     },
-    onError: (_error, variables) => {
-      setFailedOpportunityId(variables.opportunityId)
+    onError: (mutationError, variables) => {
+      const message = mutationError instanceof ApiError ? mutationError.message : 'Failed to update status. Please try again.'
+      setFailedOpportunity({ id: variables.opportunityId, message })
     },
     onSettled: () => {
       setPendingOpportunityId(null)
     },
   })
 
-  const handleSubmitStatus = (opportunityId: string, status: OpportunityStatus) => {
+  const handleSubmitStatus = (opportunityId: string, status: SettableOpportunityStatus) => {
     setJustUpdatedOpportunityId(null)
-    setFailedOpportunityId(null)
+    setFailedOpportunity(null)
     setPendingOpportunityId(opportunityId)
     statusMutation.mutate({ opportunityId, status })
   }
@@ -211,7 +223,7 @@ export default function LeadDetailPage() {
                     onSubmitStatus={handleSubmitStatus}
                     isLoading={pendingOpportunityId === opp.id}
                     justUpdated={justUpdatedOpportunityId === opp.id}
-                    justFailed={failedOpportunityId === opp.id}
+                    failureMessage={failedOpportunity?.id === opp.id ? failedOpportunity.message : null}
                   />
                 ))}
               </div>
