@@ -76,6 +76,7 @@ export interface PropertyUnit {
   id: string
   projectId: string
   code: string // e.g. "Plot A-105"
+  areaSqft?: number
   availability: PropertyAvailability
 }
 
