@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { PageLoading, InlineError, EmptyState } from '@/components/ui/States'
+import { WidgetBoundary } from '@/components/errors/WidgetBoundary'
 import { formatDateTime, formatRemaining } from '@/lib/format'
 import { ApiError } from '@/lib/api/client'
-import type { FollowUpAction, OpportunityStatus } from '@/lib/types/domain'
+import type { FollowUpAction, Opportunity, OpportunityStatus } from '@/lib/types/domain'
 
 // Only these three renew the 3-day lock (spec §5) — a plain NOTE does not.
 const FOLLOW_UP_OPTIONS: { value: FollowUpAction['actionType']; label: string; qualifying: boolean }[] = [
@@ -41,6 +42,50 @@ function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 
   }
 }
 
+interface OpportunityCardProps {
+  opportunity: Opportunity
+  statusMutation: ReturnType<typeof useMutation<Opportunity, Error, OpportunityStatus>>
+}
+
+function OpportunityCard({ opportunity, statusMutation }: OpportunityCardProps) {
+  return (
+    <div className="rounded-md border border-forest-800/10 bg-forest-800/2 p-3">
+      <div className="flex flex-col gap-3 text-sm">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Source</p>
+            <p className="mt-1 text-ink-900">{opportunity.sourceOwnerType.replace('_', ' ')}</p>
+          </div>
+          <Badge tone={getStatusBadgeTone(opportunity.status)}>
+            {OPPORTUNITY_STATUS_OPTIONS.find((o) => o.value === opportunity.status)?.label}
+          </Badge>
+        </div>
+
+        <div className="border-t border-forest-800/10 pt-3">
+          <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Change Status</label>
+          <div className="mt-2 flex items-center gap-2">
+            <Select
+              value={opportunity.status}
+              onChange={(e) => statusMutation.mutate({ opportunityId: opportunity.id, status: e.target.value as OpportunityStatus })}
+              disabled={statusMutation.isPending}
+            >
+              {OPPORTUNITY_STATUS_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
+
+        {statusMutation.isError && (
+          <div className="text-xs text-status-danger">Failed to update status.</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function LeadDetailPage() {
   const { leadId = '' } = useParams()
   const location = useLocation()
@@ -63,9 +108,8 @@ export default function LeadDetailPage() {
   })
 
   const statusMutation = useMutation({
-    mutationFn: (status: OpportunityStatus) => {
-      if (!data?.opportunity?.id) throw new Error('No opportunity found')
-      return updateOpportunityStatus(data.opportunity.id, status)
+    mutationFn: (payload: { opportunityId: string; status: OpportunityStatus }) => {
+      return updateOpportunityStatus(payload.opportunityId, payload.status)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lead', leadId] })
@@ -77,7 +121,7 @@ export default function LeadDetailPage() {
   if (error) return <InlineError message={error instanceof ApiError ? error.message : 'Failed to load this lead.'} />
   if (!data) return null
 
-  const { lead, visits, followUps, activeLock, opportunity } = data
+  const { lead, visits, followUps, activeLock, opportunities } = data
 
   return (
     <div className="max-w-3xl">
@@ -98,110 +142,97 @@ export default function LeadDetailPage() {
       )}
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Lead &amp; Property Lock</p>
-          {activeLock ? (
-            <div className="mt-2 flex items-center justify-between">
-              <span className="text-sm text-ink-900">Locked to you</span>
-              <Badge tone="warning">{formatRemaining(activeLock.expiresAt)}</Badge>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-ink-500">No active protection on this lead.</p>
-          )}
-        </Card>
-        <Card>
-          <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Opportunity</p>
-          {opportunity ? (
-            <div className="mt-2 flex flex-col gap-3 text-sm">
-              <div>
-                <span className="text-ink-900">
-                  Source: <span className="font-semibold">{opportunity.sourceOwnerType.replace('_', ' ')}</span>
-                </span>
+        <WidgetBoundary label="Lead & Property Lock">
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Lead &amp; Property Lock</p>
+            {activeLock ? (
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-sm text-ink-900">Locked to you</span>
+                <Badge tone="warning">{formatRemaining(activeLock.expiresAt)}</Badge>
               </div>
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Status</label>
-                <div className="flex items-center gap-2">
-                  <Select
-                    value={opportunity.status}
-                    onChange={(e) => statusMutation.mutate(e.target.value as OpportunityStatus)}
-                    disabled={statusMutation.isPending}
-                  >
-                    {OPPORTUNITY_STATUS_OPTIONS.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </Select>
-                  <Badge tone={getStatusBadgeTone(opportunity.status)}>{OPPORTUNITY_STATUS_OPTIONS.find((o) => o.value === opportunity.status)?.label}</Badge>
-                </div>
+            ) : (
+              <p className="mt-2 text-sm text-ink-500">No active protection on this lead.</p>
+            )}
+          </Card>
+        </WidgetBoundary>
+
+        <WidgetBoundary label="Opportunities">
+          <Card>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Opportunities</p>
+            {opportunities.length === 0 ? (
+              <p className="mt-2 text-sm text-ink-500">No opportunities recorded yet.</p>
+            ) : (
+              <div className="mt-3 space-y-4">
+                {opportunities.map((opp) => (
+                  <OpportunityCard key={opp.id} opportunity={opp} statusMutation={statusMutation} />
+                ))}
               </div>
-              {statusMutation.isError && (
-                <div className="text-xs text-status-danger">Failed to update status.</div>
-              )}
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-ink-500">No opportunity recorded yet.</p>
-          )}
-        </Card>
+            )}
+          </Card>
+        </WidgetBoundary>
       </div>
 
-      <Card className="mb-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-base text-ink-900">Log a follow-up</h2>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[220px] flex-1">
-            <Select
-              label="Action"
-              value={actionType}
-              onChange={(e) => setActionType(e.target.value as FollowUpAction['actionType'])}
-            >
-              {FOLLOW_UP_OPTIONS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </Select>
+      <WidgetBoundary label="Log Follow-up">
+        <Card className="mb-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-base text-ink-900">Log a follow-up</h2>
           </div>
-          <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>
-            {isQualifyingAction ? 'Log & Renew Protection' : 'Log Note'}
-          </Button>
-        </div>
-        <p className="mt-2 text-xs text-ink-500">
-          Only calls, scheduled visits, and proposals extend your hold on this lead.
-        </p>
-        {mutation.isError && (
-          <div className="mt-3">
-            <InlineError message={mutation.error instanceof ApiError ? mutation.error.message : 'Failed to log follow-up.'} />
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="min-w-[220px] flex-1">
+              <Select
+                label="Action"
+                value={actionType}
+                onChange={(e) => setActionType(e.target.value as FollowUpAction['actionType'])}
+              >
+                {FOLLOW_UP_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>
+              {isQualifyingAction ? 'Log & Renew Protection' : 'Log Note'}
+            </Button>
           </div>
-        )}
-      </Card>
+          <p className="mt-2 text-xs text-ink-500">
+            Only calls, scheduled visits, and proposals extend your hold on this lead.
+          </p>
+          {mutation.isError && (
+            <div className="mt-3">
+              <InlineError message={mutation.error instanceof ApiError ? mutation.error.message : 'Failed to log follow-up.'} />
+            </div>
+          )}
+        </Card>
+      </WidgetBoundary>
 
-      <Card className="mb-6">
-        <h2 className="mb-4 font-display text-base text-ink-900">Timeline</h2>
-        {visits.length === 0 && followUps.length === 0 && (
-          <EmptyState title="No activity yet" description="Visits and follow-ups will appear here." />
-        )}
-        <ul className="flex flex-col gap-4">
-          {[...visits.map((v) => ({ type: 'visit' as const, at: v.visitAt, data: v })), ...followUps.map((f) => ({ type: 'followup' as const, at: f.loggedAt, data: f }))]
-            .sort((a, b) => b.at.localeCompare(a.at))
-            .map((item) => (
-              <li key={`${item.type}-${item.data.id}`} className="border-l-2 border-gold-400 pl-4">
-                <p className="text-xs text-ink-500">{formatDateTime(item.at)}</p>
-                {item.type === 'visit' ? (
-                  <p className="text-sm text-ink-900">
-                    Site visit logged{item.data.outcome ? ` — ${item.data.outcome.replace(/_/g, ' ')}` : ''}
-                    {item.data.notes && <span className="block text-ink-500">{item.data.notes}</span>}
-                  </p>
-                ) : (
-                  <p className="text-sm text-ink-900">
-                    {FOLLOW_UP_OPTIONS.find((o) => o.value === item.data.actionType)?.label ?? item.data.actionType}
-                  </p>
-                )}
-              </li>
-            ))}
-        </ul>
-      </Card>
+      <WidgetBoundary label="Timeline">
+        <Card className="mb-6">
+          <h2 className="mb-4 font-display text-base text-ink-900">Timeline</h2>
+          {visits.length === 0 && followUps.length === 0 && (
+            <EmptyState title="No activity yet" description="Visits and follow-ups will appear here." />
+          )}
+          <ul className="flex flex-col gap-4">
+            {[...visits.map((v) => ({ type: 'visit' as const, at: v.visitAt, data: v })), ...followUps.map((f) => ({ type: 'followup' as const, at: f.loggedAt, data: f }))]
+              .sort((a, b) => b.at.localeCompare(a.at))
+              .map((item) => (
+                <li key={`${item.type}-${item.data.id}`} className="border-l-2 border-gold-400 pl-4">
+                  <p className="text-xs text-ink-500">{formatDateTime(item.at)}</p>
+                  {item.type === 'visit' ? (
+                    <p className="text-sm text-ink-900">
+                      Site visit logged{item.data.outcome ? ` — ${item.data.outcome.replace(/_/g, ' ')}` : ''}
+                      {item.data.notes && <span className="block text-ink-500">{item.data.notes}</span>}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-ink-900">
+                      {FOLLOW_UP_OPTIONS.find((o) => o.value === item.data.actionType)?.label ?? item.data.actionType}
+                    </p>
+                  )}
+                </li>
+              ))}
+          </ul>
+        </Card>
+      </WidgetBoundary>
     </div>
   )
 }
