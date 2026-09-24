@@ -5,6 +5,23 @@ import type { FollowUpAction, Lead, LeadLock, Opportunity, Paginated, SiteVisit 
 
 // ---- Leads list ----
 
+interface LiveOpportunityRaw {
+  id: string
+  project_id: string
+  property_id?: string | null
+  source_owner_type: Opportunity['sourceOwnerType']
+  source_owner_employee_id?: string | null
+  source_owner_channel_partner_id?: string | null
+  handling_employee_id?: string | null
+  source: Opportunity['source']
+  status: Opportunity['status']
+  attribution_status: Opportunity['attributionStatus']
+  locked_at: string
+  expires_at: string
+  created_at: string
+  updated_at: string
+}
+
 interface LiveLeadRaw {
   id: string
   name: string
@@ -12,11 +29,12 @@ interface LiveLeadRaw {
   phone?: string
   email?: string
   source: Lead['source']
-  originating_employee_id: string
+  originating_employee_id?: string
   current_employee_id?: string
   lifecycle_status: Lead['lifecycleStatus']
   first_visit_at?: string
   latest_visit_at?: string
+  opportunities?: LiveOpportunityRaw[]
 }
 
 function adaptLiveLead(raw: LiveLeadRaw): Lead {
@@ -59,6 +77,7 @@ export interface LeadDetail {
   followUps: FollowUpAction[]
   activeLock: LeadLock | null
   opportunity: Opportunity | null
+  opportunities: Opportunity[]
 }
 
 interface LiveFollowUpRaw {
@@ -69,6 +88,23 @@ interface LiveFollowUpRaw {
   logged_at: string
   notes?: string
   reference?: string
+}
+
+function adaptLiveOpportunity(raw: LiveOpportunityRaw): Opportunity {
+  return {
+    id: raw.id,
+    leadId: '',
+    projectId: raw.project_id,
+    propertyId: raw.property_id ?? undefined,
+    sourceOwnerType: raw.source_owner_type,
+    sourceOwnerId: raw.source_owner_employee_id ?? raw.source_owner_channel_partner_id ?? '',
+    handlingEmployeeId: raw.handling_employee_id,
+    source: raw.source,
+    status: raw.status,
+    lockedAt: raw.locked_at,
+    expiresAt: raw.expires_at,
+    attributionStatus: raw.attribution_status,
+  }
 }
 
 function adaptLiveFollowUp(raw: LiveFollowUpRaw): FollowUpAction {
@@ -99,10 +135,10 @@ interface LiveActiveLockRaw {
  * flag this to the backend team if lead detail needs richer data in one call.
  */
 async function fetchLeadDetailLive(leadId: string): Promise<LeadDetail> {
-  const [lead, followUpsRaw] = await Promise.all([
-    liveFetch<LiveLeadRaw>(`/leads/${leadId}`).then(adaptLiveLead),
-    liveFetch<LiveFollowUpRaw[]>(`/leads/${leadId}/follow-ups`).catch(() => [] as LiveFollowUpRaw[]),
-  ])
+  const leadRaw = await liveFetch<{ data: LiveLeadRaw }>(`/api/v1/leads/${leadId}`).then((r) => r.data)
+  const lead = adaptLiveLead(leadRaw)
+
+  const followUpsRaw = await liveFetch<LiveFollowUpRaw[]>(`/leads/${leadId}/follow-ups`).catch(() => [] as LiveFollowUpRaw[])
 
   let activeLock: LeadLock | null = null
   try {
@@ -122,6 +158,12 @@ async function fetchLeadDetailLive(leadId: string): Promise<LeadDetail> {
     // best-effort — omit lock info rather than failing the whole page
   }
 
+  // Extract opportunities from lead data (new backend structure)
+  const opportunities = (leadRaw.opportunities ?? [])
+    .filter((o) => o.status !== 'RELEASED')
+    .map(adaptLiveOpportunity)
+    .map((o) => ({ ...o, leadId }))
+
   return {
     lead,
     followUps: followUpsRaw.map(adaptLiveFollowUp),
@@ -129,12 +171,17 @@ async function fetchLeadDetailLive(leadId: string): Promise<LeadDetail> {
     // live mode rather than guessed at. See NOTE above.
     visits: [],
     activeLock,
-    opportunity: null,
+    opportunity: opportunities[0] ?? null,
+    opportunities,
   }
 }
 
 async function fetchLeadDetailMock(leadId: string): Promise<LeadDetail> {
-  return apiFetch<LeadDetail>(`/leads/${leadId}`)
+  const data = await apiFetch<LeadDetail>(`/leads/${leadId}`)
+  return {
+    ...data,
+    opportunities: data.opportunity ? [data.opportunity] : [],
+  }
 }
 
 export function fetchLeadDetail(leadId: string): Promise<LeadDetail> {
