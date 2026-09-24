@@ -6,20 +6,20 @@
   --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, Consolas, monospace;
 
-  --color-forest-950: #10231b;
-  --color-forest-900: #163024;
-  --color-forest-800: #1c3a2f;
-  --color-forest-700: #234a3a;
-  --color-forest-600: #2c5c48;
+  --color-forest-950: #0f1b2e;
+  --color-forest-900: #1a2e42;
+  --color-forest-800: #2d4259;
+  --color-forest-700: #3d5472;
+  --color-forest-600: #4d668b;
 
   --color-cream-50: #fdfcf9;
   --color-cream-100: #f7f3ea;
   --color-cream-200: #efe8d8;
   --color-cream-300: #e3d9c1;
 
-  --color-gold-400: #d9a95c;
-  --color-gold-500: #c88a3f;
-  --color-gold-600: #ad7530;
+  --color-gold-400: #5b8ac9;
+  --color-gold-500: #4a7ab8;
+  --color-gold-600: #3968a7;
 
   --color-ink-900: #1a1d1b;
   --color-ink-700: #3f453f;
@@ -31,7 +31,7 @@
   --color-status-warning-bg: #faedd8;
   --color-status-danger: #b33a3a;
   --color-status-danger-bg: #fbe6e6;
-  --color-status-info: #2f5f8a;
+  --color-status-info: #2d4259;
   --color-status-info-bg: #e5eef7;
 }
 
