@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { fetchSiteVisits } from '@/features/site-visits/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { fetchSiteVisits, type SiteVisitWithRefs } from '@/features/site-visits/api'
+import { updateOpportunityStatus, type SettableOpportunityStatus } from '@/features/leads/api'
+import { OpportunityCard } from '@/features/leads/OpportunityCard'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -19,6 +21,32 @@ const OUTCOME_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'>
   NO_SHOW: 'danger',
 }
 
+function VisitOpportunity({ visit }: { visit: SiteVisitWithRefs }) {
+  const queryClient = useQueryClient()
+  const mutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: SettableOpportunityStatus }) => updateOpportunityStatus(id, status),
+    onSettled: () => {
+      // A repeat visit can share its opportunity with other rows and the lead page.
+      for (const queryKey of [['site-visits'], ['lead', visit.leadId], ['leads'], ['dashboard'], ['properties']]) {
+        queryClient.invalidateQueries({ queryKey })
+      }
+    },
+  })
+
+  if (!visit.opportunity) return (
+    <p className="text-sm text-ink-500">Opportunity unavailable for this visit. <Link className="underline" to={`/leads/${visit.leadId}`}>View lead</Link></p>
+  )
+
+  return <OpportunityCard
+    opportunity={visit.opportunity}
+    canUpdate={visit.canUpdateOpportunity ?? false}
+    onSubmitStatus={(id, status) => mutation.mutate({ id, status })}
+    isLoading={mutation.isPending}
+    justUpdated={mutation.isSuccess}
+    failureMessage={mutation.isError ? (mutation.error instanceof ApiError ? mutation.error.message : 'Unable to update this opportunity. Please try again.') : null}
+  />
+}
+
 export default function SiteVisitsListPage() {
   const [page, setPage] = useState(1)
   const { data, isLoading, error } = useQuery({
@@ -30,7 +58,7 @@ export default function SiteVisitsListPage() {
     <div>
       <PageHeader
         title="Site Visits"
-        subtitle="Every submission here creates or updates a Lead."
+        subtitle="View each visit’s opportunity and update its status."
         actions={
           <Link to="/site-visits/new">
             <Button size="sm">+ Log Visit</Button>
@@ -74,6 +102,10 @@ export default function SiteVisitsListPage() {
                   </p>
                 </div>
                 {v.outcome && <Badge tone={OUTCOME_TONE[v.outcome] ?? 'neutral'}>{v.outcome.replace(/_/g, ' ')}</Badge>}
+                <div className="w-full">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">Opportunity</p>
+                  <VisitOpportunity visit={v} />
+                </div>
               </li>
             ))}
           </ul>

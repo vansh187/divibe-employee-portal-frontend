@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { OpportunityCard } from '@/features/leads/OpportunityCard'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchLeadDetail, addFollowUp, updateOpportunityStatus } from '@/features/leads/api'
@@ -12,7 +13,7 @@ import { PageLoading, InlineError, EmptyState } from '@/components/ui/States'
 import { WidgetBoundary } from '@/components/errors/WidgetBoundary'
 import { formatDateTime, formatRemaining } from '@/lib/format'
 import { ApiError } from '@/lib/api/client'
-import type { FollowUpAction, Opportunity, OpportunityStatus } from '@/lib/types/domain'
+import type { FollowUpAction } from '@/lib/types/domain'
 
 // Only these three renew the 3-day lock (spec §5) — a plain NOTE does not.
 const FOLLOW_UP_OPTIONS: { value: FollowUpAction['actionType']; label: string; qualifying: boolean }[] = [
@@ -21,117 +22,6 @@ const FOLLOW_UP_OPTIONS: { value: FollowUpAction['actionType']; label: string; q
   { value: 'PROPOSAL_SENT', label: 'Proposal/quotation sent', qualifying: true },
   { value: 'NOTE', label: 'Note (does not extend your hold)', qualifying: false },
 ]
-
-// Full set, for the read-only status badge (ACTIVE/EXPIRED/ATTRIBUTION_CONFLICT
-// are backend-derived and can't be set by the employee).
-const OPPORTUNITY_STATUS_LABELS: Record<OpportunityStatus, string> = {
-  ACTIVE: 'In Progress',
-  INTERESTED: 'Interested',
-  DEAL_IN_PROGRESS: 'Deal In Progress',
-  CONVERTED: 'Deal Complete',
-  DEAL_REJECTED: 'Deal Rejected',
-  LOST: 'Lost',
-  EXPIRED: 'Expired',
-  RELEASED: 'Released',
-  ATTRIBUTION_CONFLICT: 'Attribution Conflict',
-}
-
-// Only these are settable via POST /opportunities/{id}/status, and only when
-// the opportunity is currently ACTIVE, INTERESTED or DEAL_IN_PROGRESS. The current status
-// is excluded from the choices in the card.
-const SETTABLE_STATUS_OPTIONS: { value: SettableOpportunityStatus; label: string }[] = [
-  { value: 'INTERESTED', label: 'Interested' },
-  { value: 'DEAL_IN_PROGRESS', label: 'Deal In Progress' },
-  { value: 'CONVERTED', label: 'Deal Complete' },
-  { value: 'DEAL_REJECTED', label: 'Deal Rejected' },
-  { value: 'LOST', label: 'Lost' },
-  { value: 'RELEASED', label: 'Release Lock' },
-]
-
-function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 'danger' | 'info' {
-  switch (status) {
-    case 'ACTIVE':
-    case 'INTERESTED':
-    case 'DEAL_IN_PROGRESS':
-      return 'info'
-    case 'CONVERTED':
-      return 'success'
-    case 'LOST':
-    case 'DEAL_REJECTED':
-    case 'EXPIRED':
-      return 'danger'
-    default:
-      return 'warning'
-  }
-}
-
-interface OpportunityCardProps {
-  opportunity: Opportunity
-  onSubmitStatus: (opportunityId: string, status: SettableOpportunityStatus) => void
-  isLoading?: boolean
-  justUpdated?: boolean
-  failureMessage?: string | null
-}
-
-function OpportunityCard({ opportunity, onSubmitStatus, isLoading, justUpdated, failureMessage }: OpportunityCardProps) {
-  const [pickedStatus, setPickedStatus] = useState<SettableOpportunityStatus | null>(null)
-  const statusOptions = SETTABLE_STATUS_OPTIONS.filter((o) => o.value !== opportunity.status)
-  const selectedStatus =
-    statusOptions.find((o) => o.value === pickedStatus)?.value ?? statusOptions[0].value
-  const canChangeStatus = ['ACTIVE', 'INTERESTED', 'DEAL_IN_PROGRESS'].includes(opportunity.status)
-
-  return (
-    <div className="rounded-md border border-forest-800/10 bg-forest-800/2 p-3">
-      <div className="flex flex-col gap-3 text-sm">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Source</p>
-            <p className="mt-1 text-ink-900">{opportunity.sourceOwnerType.replace('_', ' ')}</p>
-          </div>
-          <Badge tone={getStatusBadgeTone(opportunity.status)}>{OPPORTUNITY_STATUS_LABELS[opportunity.status]}</Badge>
-        </div>
-
-        {canChangeStatus ? (
-          <div className="border-t border-forest-800/10 pt-3">
-            <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Change Status</label>
-            <div className="mt-2 flex items-center gap-2">
-              <Select
-                value={selectedStatus}
-                onChange={(e) => setPickedStatus(e.target.value as SettableOpportunityStatus)}
-                disabled={isLoading}
-              >
-                {statusOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </Select>
-              <Button size="sm" onClick={() => onSubmitStatus(opportunity.id, selectedStatus)} isLoading={isLoading}>
-                Submit
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <p className="border-t border-forest-800/10 pt-3 text-xs text-ink-500">
-            This opportunity is {OPPORTUNITY_STATUS_LABELS[opportunity.status].toLowerCase()} and can no longer be changed.
-          </p>
-        )}
-
-        {justUpdated && (
-          <div className="rounded-md border border-status-success/30 bg-status-success-bg px-3 py-2 text-xs text-status-success">
-            Deal updated — status is now <span className="font-semibold">{OPPORTUNITY_STATUS_LABELS[opportunity.status]}</span>.
-          </div>
-        )}
-
-        {failureMessage && (
-          <div className="rounded-md border border-status-danger/30 bg-status-danger-bg px-3 py-2 text-xs text-status-danger">
-            {failureMessage}
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export default function LeadDetailPage() {
   const { leadId = '' } = useParams()
@@ -163,6 +53,8 @@ export default function LeadDetailPage() {
       return updateOpportunityStatus(payload.opportunityId, payload.status)
     },
     onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['site-visits'] })
+      queryClient.invalidateQueries({ queryKey: ['properties'] })
       queryClient.invalidateQueries({ queryKey: ['lead', leadId] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       setJustUpdatedOpportunityId(variables.opportunityId)

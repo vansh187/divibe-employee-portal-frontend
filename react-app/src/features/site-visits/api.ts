@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api/client'
 import { liveFetch, liveFetchPaginated } from '@/lib/api/liveClient'
 import { API_MODE } from '@/lib/apiMode'
+import { adaptLiveOpportunity, type LiveOpportunityRaw } from '@/features/leads/api'
 import type { Lead, Opportunity, Paginated, Project, PropertyUnit, SiteVisit, SiteVisitOutcome } from '@/lib/types/domain'
 
 export interface SiteVisitWithRefs extends SiteVisit {
@@ -12,6 +13,8 @@ export interface SiteVisitWithRefs extends SiteVisit {
   lead?: Lead
   project?: Project
   property?: PropertyUnit
+  opportunity?: Opportunity | null
+  canUpdateOpportunity?: boolean
 }
 
 interface LiveSiteVisitRaw {
@@ -31,6 +34,8 @@ interface LiveSiteVisitRaw {
   lead_name?: string
   project_name?: string
   plot_no?: string
+  opportunity?: LiveOpportunityRaw | null
+  can_update_opportunity?: boolean
 }
 
 function adaptLiveSiteVisit(raw: LiveSiteVisitRaw): SiteVisitWithRefs {
@@ -51,6 +56,8 @@ function adaptLiveSiteVisit(raw: LiveSiteVisitRaw): SiteVisitWithRefs {
     lead: raw.lead_name ? ({ name: raw.lead_name } as Lead) : undefined,
     project: raw.project_name ? ({ name: raw.project_name } as Project) : undefined,
     property: raw.plot_no ? ({ code: raw.plot_no } as PropertyUnit) : undefined,
+    opportunity: raw.opportunity ? adaptLiveOpportunity(raw.opportunity) : null,
+    canUpdateOpportunity: raw.can_update_opportunity ?? false,
   }
 }
 
@@ -98,6 +105,7 @@ interface LiveCreateSiteVisitRaw {
   notes?: string
   outcome?: SiteVisitOutcome
   created_at: string
+  opportunity?: LiveOpportunityRaw | null
   lead?: { id: string; name: string; normalized_phone?: string; phone?: string; email?: string }
 }
 
@@ -116,6 +124,7 @@ function createSiteVisitLive(input: CreateSiteVisitInput): Promise<CreateSiteVis
       idempotency_key: input.idempotencyKey,
     },
   }).then((raw) => ({
+    opportunity: raw.opportunity ? adaptLiveOpportunity(raw.opportunity) : undefined,
     visit: {
       id: raw.id,
       employeeId: raw.employee_id,

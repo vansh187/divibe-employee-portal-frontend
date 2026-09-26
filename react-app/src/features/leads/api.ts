@@ -1,11 +1,12 @@
 import { apiFetch } from '@/lib/api/client'
 import { liveFetch, liveFetchPaginated } from '@/lib/api/liveClient'
 import { API_MODE } from '@/lib/apiMode'
+import { OPEN_STATUSES } from '@/lib/opportunityTransitions'
 import type { FollowUpAction, Lead, LeadLock, Opportunity, Paginated, SiteVisit } from '@/lib/types/domain'
 
 // ---- Leads list ----
 
-interface LiveOpportunityRaw {
+export interface LiveOpportunityRaw {
   id: string
   lead_id?: string
   project_id: string
@@ -24,7 +25,7 @@ interface LiveOpportunityRaw {
 }
 
 // Only these can be set via POST /opportunities/{id}/status — the backend
-// derives ACTIVE, EXPIRED, and ATTRIBUTION_CONFLICT itself.
+// derives NEW, ACTIVE, EXPIRED, and ATTRIBUTION_CONFLICT itself.
 export type SettableOpportunityStatus = 'INTERESTED' | 'DEAL_IN_PROGRESS' | 'CONVERTED' | 'DEAL_REJECTED' | 'LOST' | 'RELEASED'
 
 interface LiveLeadRaw {
@@ -95,7 +96,7 @@ interface LiveFollowUpRaw {
   reference?: string
 }
 
-function adaptLiveOpportunity(raw: LiveOpportunityRaw): Opportunity {
+export function adaptLiveOpportunity(raw: LiveOpportunityRaw): Opportunity {
   return {
     id: raw.id,
     leadId: raw.lead_id ?? '',
@@ -131,13 +132,8 @@ interface LiveActiveLockRaw {
 }
 
 /**
- * NOTE: the API guide doesn't document a combined "lead detail" payload (only
- * separate list/follow-up endpoints), so this composes it from three calls:
- * the lead itself, its follow-ups, and a client-side lookup against
- * /leads/active-locks and /opportunities for lock/attribution status. The
- * opportunity and lock lookups are best-effort (wrapped so a failure there
- * doesn't break the page) until the backend exposes something more direct —
- * flag this to the backend team if lead detail needs richer data in one call.
+ * GET /leads/{id} includes the lead's opportunities. Follow-ups and active
+ * locks are loaded separately; a lock ID must never be used as an opportunity ID.
  */
 async function fetchLeadDetailLive(leadId: string): Promise<LeadDetail> {
   const leadRaw = await liveFetch<LiveLeadRaw>(`/leads/${leadId}`)
@@ -165,7 +161,6 @@ async function fetchLeadDetailLive(leadId: string): Promise<LeadDetail> {
 
   // Extract opportunities from lead data (new backend structure)
   const opportunities = (leadRaw.opportunities ?? [])
-    .filter((o) => o.status !== 'RELEASED')
     .map(adaptLiveOpportunity)
     .map((o) => ({ ...o, leadId }))
 
@@ -173,10 +168,11 @@ async function fetchLeadDetailLive(leadId: string): Promise<LeadDetail> {
     lead,
     followUps: followUpsRaw.map(adaptLiveFollowUp),
     // Per-lead visit history isn't a documented endpoint yet — left empty in
-    // live mode rather than guessed at. See NOTE above.
+    // live mode rather than guessed at.
     visits: [],
     activeLock,
-    opportunity: opportunities[0] ?? null,
+    // Prefer the open opportunity; closed/released ones still render in `opportunities`.
+    opportunity: opportunities.find((o) => OPEN_STATUSES.includes(o.status)) ?? opportunities[0] ?? null,
     opportunities,
   }
 }

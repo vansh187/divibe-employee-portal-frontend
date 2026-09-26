@@ -1,4 +1,5 @@
 import { http, HttpResponse, delay } from 'msw'
+import { isAllowedTransition } from '@/lib/opportunityTransitions'
 import { getDb, saveDb, nextId } from '@/lib/mock/store'
 import { weekKeyFor } from '@/lib/week'
 import { LOCK_WINDOW_DAYS } from '@/lib/constants'
@@ -311,7 +312,7 @@ export const handlers = [
       if (leadLock) leadLock.expiresAt = newExpiry.toISOString()
       const propLock = db.propertyLocks.find((p) => p.leadLockId === lead.id && p.status === 'ACTIVE')
       if (propLock) propLock.expiresAt = newExpiry.toISOString()
-      const opp = db.opportunities.find((o) => o.leadId === lead.id && o.status === 'ACTIVE')
+      const opp = db.opportunities.find((o) => o.leadId === lead.id && ['NEW', 'ACTIVE', 'INTERESTED', 'DEAL_IN_PROGRESS'].includes(o.status))
       if (opp) opp.expiresAt = newExpiry.toISOString()
     }
     saveDb()
@@ -320,7 +321,7 @@ export const handlers = [
 
   // Mirrors POST /api/v1/opportunities/:id/status on the live backend — only
   // INTERESTED, DEAL_IN_PROGRESS, CONVERTED, DEAL_REJECTED, LOST, RELEASED are settable, and
-  // only from ACTIVE, INTERESTED or DEAL_IN_PROGRESS; ACTIVE/EXPIRED/ATTRIBUTION_CONFLICT
+  // only from NEW, ACTIVE, INTERESTED or DEAL_IN_PROGRESS; NEW/ACTIVE/EXPIRED/ATTRIBUTION_CONFLICT
   // are backend-derived.
   http.post(`${API}/opportunities/:opportunityId/status`, async ({ request, params }) => {
     await delay(LATENCY)
@@ -335,14 +336,17 @@ export const handlers = [
     if (!body.status || !allowed.includes(body.status)) {
       return err(422, { code: 'VALIDATION_FAILED', message: `status must be one of ${allowed.join(', ')}.` })
     }
-    if (!['ACTIVE', 'INTERESTED', 'DEAL_IN_PROGRESS'].includes(opportunity.status)) {
+    if (!['NEW', 'ACTIVE', 'INTERESTED', 'DEAL_IN_PROGRESS'].includes(opportunity.status)) {
       return err(409, {
         code: 'OPPORTUNITY_NOT_ACTIVE',
-        message: `Opportunity is '${opportunity.status}'; only an ACTIVE, INTERESTED or DEAL_IN_PROGRESS opportunity can be updated.`,
+        message: `Opportunity is '${opportunity.status}'; only a NEW, ACTIVE, INTERESTED or DEAL_IN_PROGRESS opportunity can be updated.`,
       })
     }
-    if (body.status === opportunity.status) {
-      return err(409, { code: 'INVALID_TRANSITION', message: `Opportunity is already '${opportunity.status}'.` })
+    if (!isAllowedTransition(opportunity.status, body.status)) {
+      return err(409, {
+        code: 'INVALID_STATUS_TRANSITION',
+        message: `Cannot move an opportunity from '${opportunity.status}' to '${body.status}'.`,
+      })
     }
     if (body.status === 'DEAL_IN_PROGRESS' && opportunity.propertyId) {
       const dealTaken = db.opportunities.some(
@@ -377,12 +381,23 @@ export const handlers = [
     const visits = db.siteVisits
       .filter((v) => v.employeeId === employeeId)
       .sort((a, b) => b.visitAt.localeCompare(a.visitAt))
-      .map((v) => ({
-        ...v,
-        lead: db.leads.find((l) => l.id === v.leadId),
-        project: db.projects.find((p) => p.id === v.projectId),
-        property: db.properties.find((p) => p.id === v.propertyId),
-      }))
+      .map((v) => {
+        const opportunity = db.opportunities.find((o) => v.opportunityId
+          ? o.id === v.opportunityId
+          : o.leadId === v.leadId && o.projectId === v.projectId && o.propertyId === v.propertyId)
+        const canUpdateOpportunity = !!opportunity
+          && (opportunity.sourceOwnerId === employeeId || opportunity.handlingEmployeeId === employeeId)
+          && ['NEW', 'ACTIVE', 'INTERESTED', 'DEAL_IN_PROGRESS'].includes(opportunity.status)
+          && !!opportunity.expiresAt && Date.parse(opportunity.expiresAt) > Date.now()
+        return {
+          ...v,
+          lead: db.leads.find((l) => l.id === v.leadId),
+          project: db.projects.find((p) => p.id === v.projectId),
+          property: db.properties.find((p) => p.id === v.propertyId),
+          opportunity: opportunity ?? null,
+          canUpdateOpportunity,
+        }
+      })
     return HttpResponse.json(paginate(visits, url))
   }),
 
@@ -465,9 +480,10 @@ export const handlers = [
     // 5. Unified Opportunity conflict check (REQ-25 §16.6) — same engine as lock check above,
     // since employee-only V1 has no Channel Partner UI, but the shape mirrors the spec so a
     // Channel Partner surface can plug into the same rules later.
-    let opportunity: Opportunity | undefined = body.propertyId
-      ? db.opportunities.find((o) => o.leadId === lead!.id && o.propertyId === body.propertyId && o.status === 'ACTIVE')
-      : undefined
+    let opportunity: Opportunity | undefined = db.opportunities.find((o) =>
+      o.leadId === lead!.id && o.projectId === body.projectId && o.propertyId === body.propertyId
+      && ['NEW', 'ACTIVE', 'INTERESTED', 'DEAL_IN_PROGRESS'].includes(o.status)
+      && !!o.expiresAt && Date.parse(o.expiresAt) > Date.now())
 
     // 6. Transactional creation: Lead resolution + Site Visit + locks + opportunity all together.
     const visit: SiteVisit = {
@@ -526,27 +542,29 @@ export const handlers = [
       }
       const property = db.properties.find((p) => p.id === body.propertyId)
       if (property && property.availability === 'AVAILABLE') property.availability = 'LOCKED'
-
-      if (!opportunity) {
-        opportunity = {
-          id: nextId('OPP'),
-          leadId: lead.id,
-          projectId: body.projectId,
-          propertyId: body.propertyId,
-          sourceOwnerType: 'EMPLOYEE',
-          sourceOwnerId: employeeId,
-          handlingEmployeeId: employeeId,
-          source: 'EMPLOYEE_SITE_VISIT',
-          status: 'ACTIVE',
-          lockedAt: new Date().toISOString(),
-          expiresAt: expiresAt.toISOString(),
-          attributionStatus: 'VERIFIED',
-        }
-        db.opportunities.push(opportunity)
-      } else {
-        opportunity.expiresAt = expiresAt.toISOString()
-      }
     }
+
+    if (!opportunity) {
+      opportunity = {
+        id: nextId('OPP'),
+        leadId: lead.id,
+        projectId: body.projectId,
+        propertyId: body.propertyId,
+        sourceOwnerType: 'EMPLOYEE',
+        sourceOwnerId: employeeId,
+        handlingEmployeeId: employeeId,
+        source: 'EMPLOYEE_SITE_VISIT',
+        status: 'NEW',
+        lockedAt: new Date().toISOString(),
+        expiresAt: expiresAt.toISOString(),
+        attributionStatus: 'VERIFIED',
+      }
+      db.opportunities.push(opportunity)
+    } else {
+      opportunity.expiresAt = expiresAt.toISOString()
+    }
+
+    visit.opportunityId = opportunity.id
 
     // Attendance derives an On-Site Visit marker for the day (informational; check-in/out remains separate).
     const attendanceForDay = db.attendance.find((a) => a.employeeId === employeeId && a.workDate === visitDate)

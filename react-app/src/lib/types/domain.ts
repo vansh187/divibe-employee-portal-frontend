@@ -16,6 +16,7 @@ export type DayOffStatus = 'OPEN' | 'SELECTED' | 'FROZEN' | 'COMPLETED'
 export type LockStatus = 'ACTIVE' | 'EXPIRED' | 'RELEASED'
 
 export type OpportunityStatus =
+  | 'NEW'
   | 'ACTIVE'
   | 'ATTRIBUTION_CONFLICT'
   | 'INTERESTED'
@@ -94,6 +95,7 @@ export interface SiteVisit {
   attachments?: string[]
   outcome?: SiteVisitOutcome
   createdAt: string
+  opportunityId?: string
 }
 
 export interface LeadLock {
