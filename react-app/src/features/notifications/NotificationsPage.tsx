@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchNotifications, markNotificationRead } from '@/features/notifications/api'
 import { fetchProjects, fetchProperties } from '@/features/properties/api'
+import { Link } from 'react-router-dom'
+import { Badge } from '@/components/ui/Badge'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -25,6 +27,24 @@ function humanizeMessage(message: string, plotCodes: Map<string, string>): strin
     .replace(/\s+·\s+(?=·|$)/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim()
+}
+
+type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral'
+
+// Unknown event types fall back to a neutral generic label — never throw.
+const EVENT_LABELS: Record<string, { label: string; tone: Tone }> = {
+  PROPERTY_LOCKED: { label: 'Plot interest', tone: 'warning' },
+  LEAD_LOCKED: { label: 'Lead visited', tone: 'warning' },
+  PROPERTY_LOCK_RELEASED: { label: 'Plot available', tone: 'success' },
+  LOCK_EXPIRING: { label: 'Lock expiring', tone: 'warning' },
+  SITE_VISIT_LOGGED: { label: 'Site visit', tone: 'info' },
+  LEAD_CREATED: { label: 'New lead', tone: 'info' },
+  DAY_OFF_FROZEN: { label: 'Day off', tone: 'neutral' },
+}
+
+function eventMeta(eventType: string | null | undefined): { label: string; tone: Tone } {
+  if (eventType && Object.prototype.hasOwnProperty.call(EVENT_LABELS, eventType)) return EVENT_LABELS[eventType]
+  return { label: 'Update', tone: 'neutral' }
 }
 
 export default function NotificationsPage() {
@@ -69,8 +89,16 @@ export default function NotificationsPage() {
             {data.items.map((n) => (
               <li key={n.id} className="flex items-start justify-between gap-3 py-3">
                 <div className="min-w-0">
+                  <div className="mb-1">
+                    <Badge tone={eventMeta(n.eventType).tone}>{eventMeta(n.eventType).label}</Badge>
+                  </div>
                   <p className={`text-sm ${n.readAt ? 'text-ink-500' : 'font-medium text-ink-900'}`}>{humanizeMessage(n.message, plotCodes)}</p>
                   <p className="text-xs text-ink-500">{formatDateTime(n.createdAt)}</p>
+                  {n.eventType === 'PROPERTY_LOCK_RELEASED' && (
+                    <Link to="/site-visits/new" className="mt-1 inline-block text-xs font-semibold text-forest-800 underline">
+                      Log a site visit to reserve it
+                    </Link>
+                  )}
                 </div>
                 {!n.readAt && (
                   <Button

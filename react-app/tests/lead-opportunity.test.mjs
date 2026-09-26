@@ -54,7 +54,7 @@ test('in-progress opportunities do not offer backward pipeline transitions', () 
 })
 
 test('a visit without a visible opportunity has a safe fallback', () => {
-  assert.match(renderVisits([{ ...siteVisit, opportunity: null }]), /Opportunity unavailable/)
+  assert.match(renderVisits([{ ...siteVisit, opportunity: null }]), /No opportunity for this visit/)
 })
 
 test('live list and create responses preserve the linked opportunity', async (t) => {

@@ -93,6 +93,12 @@ export interface CreateSiteVisitResult {
   visit: SiteVisit
   lead: Lead
   opportunity?: Opportunity
+  /** Plot is held by another employee: visit saved, customer waitlisted, no lock or opportunity. */
+  waitlisted: boolean
+  /** Lead is locked to another employee: visit saved only. */
+  leadHeld: boolean
+  /** When the current hold ends (earliest the plot/lead can free up). */
+  heldUntil: string | null
 }
 
 interface LiveCreateSiteVisitRaw {
@@ -106,6 +112,9 @@ interface LiveCreateSiteVisitRaw {
   outcome?: SiteVisitOutcome
   created_at: string
   opportunity?: LiveOpportunityRaw | null
+  waitlisted?: boolean
+  lead_held?: boolean
+  held_until?: string | null
   lead?: { id: string; name: string; normalized_phone?: string; phone?: string; email?: string }
 }
 
@@ -125,6 +134,9 @@ function createSiteVisitLive(input: CreateSiteVisitInput): Promise<CreateSiteVis
     },
   }).then((raw) => ({
     opportunity: raw.opportunity ? adaptLiveOpportunity(raw.opportunity) : undefined,
+    waitlisted: raw.waitlisted === true,
+    leadHeld: raw.lead_held === true,
+    heldUntil: raw.held_until ?? null,
     visit: {
       id: raw.id,
       employeeId: raw.employee_id,
@@ -154,7 +166,20 @@ function createSiteVisitLive(input: CreateSiteVisitInput): Promise<CreateSiteVis
 }
 
 function createSiteVisitMock(input: CreateSiteVisitInput): Promise<CreateSiteVisitResult> {
-  return apiFetch<CreateSiteVisitResult>('/site-visits', { method: 'POST', body: input })
+  return apiFetch<
+    Omit<CreateSiteVisitResult, 'waitlisted' | 'leadHeld' | 'heldUntil'> & {
+      waitlisted?: boolean
+      lead_held?: boolean
+      held_until?: string | null
+    }
+  >('/site-visits', { method: 'POST', body: input }).then((raw) => ({
+    visit: raw.visit,
+    lead: raw.lead,
+    opportunity: raw.opportunity ?? undefined,
+    waitlisted: raw.waitlisted === true,
+    leadHeld: raw.lead_held === true,
+    heldUntil: raw.held_until ?? null,
+  }))
 }
 
 export function createSiteVisit(input: CreateSiteVisitInput): Promise<CreateSiteVisitResult> {
