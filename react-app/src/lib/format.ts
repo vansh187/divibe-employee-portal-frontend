@@ -25,3 +25,7 @@ export function formatTime(iso: string): string {
 export function formatDateTime(iso: string): string {
   return `${formatDate(iso)} · ${formatTime(iso)}`
 }
+
+export function isToday(iso: string): boolean {
+  return new Date(iso).toDateString() === new Date().toDateString()
+}
