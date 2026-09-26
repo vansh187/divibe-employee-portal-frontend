@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { fetchProjects, fetchProperties } from '@/features/properties/api'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { WidgetBoundary } from '@/components/errors/WidgetBoundary'
@@ -77,6 +79,18 @@ function OpportunityCardInner({ opportunity, onSubmitStatus, isLoading, justUpda
     const timer = setInterval(() => setNow(Date.now()), 30_000)
     return () => clearInterval(timer)
   }, [])
+  // Prefer names embedded by the API; otherwise resolve from the (cached) project/plot lists.
+  const needProject = !opportunity.projectName && !!opportunity.projectId
+  const needPlot = !opportunity.plotNo && !!opportunity.propertyId && !!opportunity.projectId
+  const { data: projects } = useQuery({ queryKey: ['projects'], queryFn: fetchProjects, enabled: needProject })
+  const { data: plots } = useQuery({
+    queryKey: ['properties', opportunity.projectId],
+    queryFn: () => fetchProperties(opportunity.projectId),
+    enabled: needPlot,
+  })
+  const projectName = opportunity.projectName ?? projects?.find((p) => p.id === opportunity.projectId)?.name
+  const plotNo = opportunity.plotNo ?? plots?.find((p) => p.id === opportunity.propertyId)?.code
+
   // API values can arrive before the frontend has been updated for a new status.
   const status: string = opportunity.status
   const isKnownStatus = status in OPPORTUNITY_STATUS_LABELS
@@ -92,7 +106,11 @@ function OpportunityCardInner({ opportunity, onSubmitStatus, isLoading, justUpda
       <div className="flex flex-col gap-3 text-sm">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Source</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Project</p>
+            <p className="mt-1 font-medium text-ink-900">{projectName ?? '—'}</p>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-500">Plot</p>
+            <p className="mt-1 font-medium text-ink-900">{plotNo ?? (opportunity.propertyId ? '—' : 'Not selected')}</p>
+            <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-500">Source</p>
             <p className="mt-1 text-ink-900">{(opportunity.sourceOwnerType ?? '').replace('_', ' ')}</p>
           </div>
           <Badge tone={getStatusBadgeTone(status)}>{statusLabel}</Badge>

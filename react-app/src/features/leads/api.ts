@@ -11,6 +11,8 @@ export interface LiveOpportunityRaw {
   lead_id?: string
   project_id: string
   property_id?: string | null
+  project_name?: string | null
+  plot_no?: string | null
   source_owner_type: Opportunity['sourceOwnerType']
   source_owner_employee_id?: string | null
   source_owner_channel_partner_id?: string | null
@@ -102,6 +104,8 @@ export function adaptLiveOpportunity(raw: LiveOpportunityRaw): Opportunity {
     leadId: raw.lead_id ?? '',
     projectId: raw.project_id,
     propertyId: raw.property_id || undefined,
+    projectName: raw.project_name || undefined,
+    plotNo: raw.plot_no || undefined,
     sourceOwnerType: raw.source_owner_type,
     sourceOwnerId: raw.source_owner_employee_id ?? raw.source_owner_channel_partner_id ?? '',
     handlingEmployeeId: raw.handling_employee_id || undefined,

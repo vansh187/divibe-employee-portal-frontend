@@ -151,6 +151,9 @@ export interface Opportunity {
   leadId: string
   projectId: string
   propertyId?: string
+  // Display names, when the API embeds them; the card falls back to a lookup.
+  projectName?: string
+  plotNo?: string
   sourceOwnerType: SourceOwnerType
   sourceOwnerId: string
   handlingEmployeeId?: string
