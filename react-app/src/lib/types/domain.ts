@@ -63,6 +63,7 @@ export interface Lead {
   email?: string
   source: 'EMPLOYEE_SITE_VISIT' | 'CHANNEL_PARTNER'
   originatingEmployeeId: string
+  originatingEmployeeName?: string
   currentEmployeeId?: string
   lifecycleStatus: 'NEW' | 'IN_PROGRESS' | 'CONVERTED' | 'LOST'
   firstVisitAt?: string
@@ -151,6 +152,9 @@ export interface Opportunity {
   leadId: string
   projectId: string
   propertyId?: string
+  // Display names, when the API embeds them; the card falls back to a lookup.
+  projectName?: string
+  plotNo?: string
   sourceOwnerType: SourceOwnerType
   sourceOwnerId: string
   handlingEmployeeId?: string

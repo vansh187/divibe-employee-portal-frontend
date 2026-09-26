@@ -11,6 +11,8 @@ export interface LiveOpportunityRaw {
   lead_id?: string
   project_id: string
   property_id?: string | null
+  project_name?: string | null
+  plot_no?: string | null
   source_owner_type: Opportunity['sourceOwnerType']
   source_owner_employee_id?: string | null
   source_owner_channel_partner_id?: string | null
@@ -36,6 +38,8 @@ interface LiveLeadRaw {
   email?: string
   source: Lead['source']
   originating_employee_id?: string
+  originating_employee_name?: string
+  created_by_name?: string
   current_employee_id?: string
   lifecycle_status: Lead['lifecycleStatus']
   first_visit_at?: string
@@ -52,6 +56,7 @@ function adaptLiveLead(raw: LiveLeadRaw): Lead {
     email: raw.email,
     source: raw.source,
     originatingEmployeeId: raw.originating_employee_id ?? '',
+    originatingEmployeeName: raw.originating_employee_name ?? raw.created_by_name,
     currentEmployeeId: raw.current_employee_id,
     lifecycleStatus: raw.lifecycle_status,
     firstVisitAt: raw.first_visit_at,
@@ -102,6 +107,8 @@ export function adaptLiveOpportunity(raw: LiveOpportunityRaw): Opportunity {
     leadId: raw.lead_id ?? '',
     projectId: raw.project_id,
     propertyId: raw.property_id || undefined,
+    projectName: raw.project_name || undefined,
+    plotNo: raw.plot_no || undefined,
     sourceOwnerType: raw.source_owner_type,
     sourceOwnerId: raw.source_owner_employee_id ?? raw.source_owner_channel_partner_id ?? '',
     handlingEmployeeId: raw.handling_employee_id || undefined,
