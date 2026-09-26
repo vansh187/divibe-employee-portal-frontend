@@ -18,6 +18,7 @@ export type LockStatus = 'ACTIVE' | 'EXPIRED' | 'RELEASED'
 export type OpportunityStatus =
   | 'ACTIVE'
   | 'ATTRIBUTION_CONFLICT'
+  | 'INTERESTED'
   | 'DEAL_IN_PROGRESS'
   | 'CONVERTED'
   | 'DEAL_REJECTED'

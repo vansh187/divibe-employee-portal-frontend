@@ -26,6 +26,7 @@ const FOLLOW_UP_OPTIONS: { value: FollowUpAction['actionType']; label: string; q
 // are backend-derived and can't be set by the employee).
 const OPPORTUNITY_STATUS_LABELS: Record<OpportunityStatus, string> = {
   ACTIVE: 'In Progress',
+  INTERESTED: 'Interested',
   DEAL_IN_PROGRESS: 'Deal In Progress',
   CONVERTED: 'Deal Complete',
   DEAL_REJECTED: 'Deal Rejected',
@@ -36,9 +37,10 @@ const OPPORTUNITY_STATUS_LABELS: Record<OpportunityStatus, string> = {
 }
 
 // Only these are settable via POST /opportunities/{id}/status, and only when
-// the opportunity is currently ACTIVE or DEAL_IN_PROGRESS. The current status
+// the opportunity is currently ACTIVE, INTERESTED or DEAL_IN_PROGRESS. The current status
 // is excluded from the choices in the card.
 const SETTABLE_STATUS_OPTIONS: { value: SettableOpportunityStatus; label: string }[] = [
+  { value: 'INTERESTED', label: 'Interested' },
   { value: 'DEAL_IN_PROGRESS', label: 'Deal In Progress' },
   { value: 'CONVERTED', label: 'Deal Complete' },
   { value: 'DEAL_REJECTED', label: 'Deal Rejected' },
@@ -49,6 +51,7 @@ const SETTABLE_STATUS_OPTIONS: { value: SettableOpportunityStatus; label: string
 function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 'danger' | 'info' {
   switch (status) {
     case 'ACTIVE':
+    case 'INTERESTED':
     case 'DEAL_IN_PROGRESS':
       return 'info'
     case 'CONVERTED':
@@ -75,7 +78,7 @@ function OpportunityCard({ opportunity, onSubmitStatus, isLoading, justUpdated, 
   const statusOptions = SETTABLE_STATUS_OPTIONS.filter((o) => o.value !== opportunity.status)
   const selectedStatus =
     statusOptions.find((o) => o.value === pickedStatus)?.value ?? statusOptions[0].value
-  const canChangeStatus = opportunity.status === 'ACTIVE' || opportunity.status === 'DEAL_IN_PROGRESS'
+  const canChangeStatus = ['ACTIVE', 'INTERESTED', 'DEAL_IN_PROGRESS'].includes(opportunity.status)
 
   return (
     <div className="rounded-md border border-forest-800/10 bg-forest-800/2 p-3">
