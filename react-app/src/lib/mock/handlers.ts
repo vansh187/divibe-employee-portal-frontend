@@ -319,8 +319,8 @@ export const handlers = [
   }),
 
   // Mirrors POST /api/v1/opportunities/:id/status on the live backend — only
-  // DEAL_IN_PROGRESS, CONVERTED, DEAL_REJECTED, LOST, RELEASED are settable, and
-  // only from ACTIVE or DEAL_IN_PROGRESS; ACTIVE/EXPIRED/ATTRIBUTION_CONFLICT
+  // INTERESTED, DEAL_IN_PROGRESS, CONVERTED, DEAL_REJECTED, LOST, RELEASED are settable, and
+  // only from ACTIVE, INTERESTED or DEAL_IN_PROGRESS; ACTIVE/EXPIRED/ATTRIBUTION_CONFLICT
   // are backend-derived.
   http.post(`${API}/opportunities/:opportunityId/status`, async ({ request, params }) => {
     await delay(LATENCY)
@@ -331,14 +331,14 @@ export const handlers = [
     if (!opportunity) return err(404, { code: 'NOT_FOUND', message: 'Opportunity not found.' })
 
     const body = (await request.json()) as { status?: string }
-    const allowed = ['DEAL_IN_PROGRESS', 'CONVERTED', 'DEAL_REJECTED', 'LOST', 'RELEASED']
+    const allowed = ['INTERESTED', 'DEAL_IN_PROGRESS', 'CONVERTED', 'DEAL_REJECTED', 'LOST', 'RELEASED']
     if (!body.status || !allowed.includes(body.status)) {
       return err(422, { code: 'VALIDATION_FAILED', message: `status must be one of ${allowed.join(', ')}.` })
     }
-    if (opportunity.status !== 'ACTIVE' && opportunity.status !== 'DEAL_IN_PROGRESS') {
+    if (!['ACTIVE', 'INTERESTED', 'DEAL_IN_PROGRESS'].includes(opportunity.status)) {
       return err(409, {
         code: 'OPPORTUNITY_NOT_ACTIVE',
-        message: `Opportunity is '${opportunity.status}'; only an ACTIVE or DEAL_IN_PROGRESS opportunity can be updated.`,
+        message: `Opportunity is '${opportunity.status}'; only an ACTIVE, INTERESTED or DEAL_IN_PROGRESS opportunity can be updated.`,
       })
     }
     if (body.status === opportunity.status) {
