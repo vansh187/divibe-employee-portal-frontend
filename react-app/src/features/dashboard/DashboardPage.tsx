@@ -5,9 +5,10 @@ import { useAuthStore } from '@/features/auth/store'
 import { StatCard, Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { VisitCharts } from '@/features/dashboard/VisitCharts'
 import { WidgetBoundary } from '@/components/errors/WidgetBoundary'
 import { SkeletonBlock, EmptyState, InlineError } from '@/components/ui/States'
-import { formatRemaining, formatTime, formatDateLong } from '@/lib/format'
+import { formatRemaining, formatTime, formatDate, formatDateLong, isToday } from '@/lib/format'
 import { DAY_OFF_STATUS_LABEL } from '@/lib/constants'
 import { ApiError } from '@/lib/api/client'
 import type { DashboardData } from '@/features/dashboard/api'
@@ -81,7 +82,9 @@ function RecentVisitsPanel({ data }: { data: DashboardData }) {
         <ul className="flex flex-col divide-y divide-forest-800/8">
           {data.recentVisits.map((v) => (
             <li key={v.id} className="flex items-start gap-3 py-3">
-              <span className="mt-0.5 w-12 shrink-0 text-xs text-ink-500">{formatTime(v.visitAt)}</span>
+              <span className="mt-0.5 w-16 shrink-0 text-xs text-ink-500">{formatTime(v.visitAt)}
+                {!isToday(v.visitAt) && <span className="block whitespace-nowrap">{formatDate(v.visitAt)}</span>}
+              </span>
               <div className="min-w-0 flex-1 border-l-2 border-gold-400 pl-3">
                 <p className="text-sm font-semibold text-ink-900">Site walk · {v.projectName ?? '—'}</p>
                 <p className="text-xs text-ink-500">Prospect: {v.leadName ?? '—'}</p>
@@ -142,6 +145,10 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-6">
           <WidgetBoundary label="Summary stats">
             <StatsRow data={data} />
+          </WidgetBoundary>
+
+          <WidgetBoundary label="Visit charts">
+            <VisitCharts />
           </WidgetBoundary>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

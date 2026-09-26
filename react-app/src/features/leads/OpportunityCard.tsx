@@ -36,10 +36,15 @@ const SETTABLE_STATUS_OPTIONS: { value: SettableOpportunityStatus; label: string
   { value: 'RELEASED', label: 'Release Lock' },
 ]
 
+// Own-property check: `in` / bracket lookup would also match inherited keys like 'constructor'.
+function hasKnownLabel(status: string): boolean {
+  return Object.prototype.hasOwnProperty.call(OPPORTUNITY_STATUS_LABELS, status)
+}
+
 // Never throws on a status this build doesn't know: falls back to the raw text.
 function getStatusLabel(status: string | null | undefined): string {
   if (!status) return 'Unknown status'
-  return (OPPORTUNITY_STATUS_LABELS as Record<string, string | undefined>)[status] ?? status
+  return hasKnownLabel(status) ? OPPORTUNITY_STATUS_LABELS[status as OpportunityStatus] : status
 }
 
 function getStatusBadgeTone(status: string | null | undefined): 'success' | 'warning' | 'danger' | 'info' | 'neutral' {
@@ -93,7 +98,7 @@ function OpportunityCardInner({ opportunity, onSubmitStatus, isLoading, justUpda
 
   // API values can arrive before the frontend has been updated for a new status.
   const status: string = opportunity.status
-  const isKnownStatus = status in OPPORTUNITY_STATUS_LABELS
+  const isKnownStatus = typeof status === 'string' && hasKnownLabel(status)
   const statusLabel = getStatusLabel(status)
   const isOpen = OPEN_STATUSES.includes(status)
   const statusOptions = SETTABLE_STATUS_OPTIONS.filter((o) => isAllowedTransition(status, o.value))
@@ -142,7 +147,7 @@ function OpportunityCardInner({ opportunity, onSubmitStatus, isLoading, justUpda
               ? 'Protection has expired. Log another visit to start a new opportunity.'
               : isKnownStatus
               ? `This opportunity is ${statusLabel.toLowerCase()} and cannot be changed here.`
-              : 'Status information is unavailable. Please refresh to get the latest details.'}
+              : 'Unknown status. Please refresh to get the latest details.'}
           </p>
         )}
 
