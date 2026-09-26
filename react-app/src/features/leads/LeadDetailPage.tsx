@@ -26,7 +26,9 @@ const FOLLOW_UP_OPTIONS: { value: FollowUpAction['actionType']; label: string; q
 // are backend-derived and can't be set by the employee).
 const OPPORTUNITY_STATUS_LABELS: Record<OpportunityStatus, string> = {
   ACTIVE: 'In Progress',
-  CONVERTED: 'Deal Closed',
+  DEAL_IN_PROGRESS: 'Deal In Progress',
+  CONVERTED: 'Deal Complete',
+  DEAL_REJECTED: 'Deal Rejected',
   LOST: 'Lost',
   EXPIRED: 'Expired',
   RELEASED: 'Released',
@@ -34,9 +36,12 @@ const OPPORTUNITY_STATUS_LABELS: Record<OpportunityStatus, string> = {
 }
 
 // Only these are settable via POST /opportunities/{id}/status, and only when
-// the opportunity is currently ACTIVE.
+// the opportunity is currently ACTIVE or DEAL_IN_PROGRESS. The current status
+// is excluded from the choices in the card.
 const SETTABLE_STATUS_OPTIONS: { value: SettableOpportunityStatus; label: string }[] = [
-  { value: 'CONVERTED', label: 'Deal Closed' },
+  { value: 'DEAL_IN_PROGRESS', label: 'Deal In Progress' },
+  { value: 'CONVERTED', label: 'Deal Complete' },
+  { value: 'DEAL_REJECTED', label: 'Deal Rejected' },
   { value: 'LOST', label: 'Lost' },
   { value: 'RELEASED', label: 'Release Lock' },
 ]
@@ -44,10 +49,12 @@ const SETTABLE_STATUS_OPTIONS: { value: SettableOpportunityStatus; label: string
 function getStatusBadgeTone(status: OpportunityStatus): 'success' | 'warning' | 'danger' | 'info' {
   switch (status) {
     case 'ACTIVE':
+    case 'DEAL_IN_PROGRESS':
       return 'info'
     case 'CONVERTED':
       return 'success'
     case 'LOST':
+    case 'DEAL_REJECTED':
     case 'EXPIRED':
       return 'danger'
     default:
@@ -64,8 +71,11 @@ interface OpportunityCardProps {
 }
 
 function OpportunityCard({ opportunity, onSubmitStatus, isLoading, justUpdated, failureMessage }: OpportunityCardProps) {
-  const [selectedStatus, setSelectedStatus] = useState<SettableOpportunityStatus>('CONVERTED')
-  const canChangeStatus = opportunity.status === 'ACTIVE'
+  const [pickedStatus, setPickedStatus] = useState<SettableOpportunityStatus | null>(null)
+  const statusOptions = SETTABLE_STATUS_OPTIONS.filter((o) => o.value !== opportunity.status)
+  const selectedStatus =
+    statusOptions.find((o) => o.value === pickedStatus)?.value ?? statusOptions[0].value
+  const canChangeStatus = opportunity.status === 'ACTIVE' || opportunity.status === 'DEAL_IN_PROGRESS'
 
   return (
     <div className="rounded-md border border-forest-800/10 bg-forest-800/2 p-3">
@@ -84,10 +94,10 @@ function OpportunityCard({ opportunity, onSubmitStatus, isLoading, justUpdated, 
             <div className="mt-2 flex items-center gap-2">
               <Select
                 value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value as SettableOpportunityStatus)}
+                onChange={(e) => setPickedStatus(e.target.value as SettableOpportunityStatus)}
                 disabled={isLoading}
               >
-                {SETTABLE_STATUS_OPTIONS.map((o) => (
+                {statusOptions.map((o) => (
                   <option key={o.value} value={o.value}>
                     {o.label}
                   </option>

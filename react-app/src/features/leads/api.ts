@@ -23,9 +23,9 @@ interface LiveOpportunityRaw {
   updated_at: string
 }
 
-// Only these three can be set via POST /opportunities/{id}/status — the backend
+// Only these can be set via POST /opportunities/{id}/status — the backend
 // derives ACTIVE, EXPIRED, and ATTRIBUTION_CONFLICT itself.
-export type SettableOpportunityStatus = 'CONVERTED' | 'LOST' | 'RELEASED'
+export type SettableOpportunityStatus = 'DEAL_IN_PROGRESS' | 'CONVERTED' | 'DEAL_REJECTED' | 'LOST' | 'RELEASED'
 
 interface LiveLeadRaw {
   id: string
