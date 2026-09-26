@@ -93,6 +93,8 @@ export default function NewSiteVisitPage() {
   const mutation = useMutation({
     mutationFn: createSiteVisit,
     onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['lead', result.lead.id] })
+      queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['site-visits'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       navigate(`/leads/${result.lead.id}`, { state: { justLogged: true } })
