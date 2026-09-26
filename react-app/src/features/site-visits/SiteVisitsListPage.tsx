@@ -34,7 +34,7 @@ function VisitOpportunity({ visit }: { visit: SiteVisitWithRefs }) {
   })
 
   if (!visit.opportunity) return (
-    <p className="text-sm text-ink-500">Opportunity unavailable for this visit. <Link className="underline" to={`/leads/${visit.leadId}`}>View lead</Link></p>
+    <p className="text-sm text-ink-500">No opportunity for this visit (for example, the plot or customer was held by another employee). <Link className="underline" to={`/leads/${visit.leadId}`}>View lead</Link></p>
   )
 
   return <OpportunityCard

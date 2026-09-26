@@ -455,26 +455,42 @@ export const handlers = [
     const activeLeadLock = db.leadLocks.find(
       (l) => l.leadId === lead!.id && l.status === 'ACTIVE' && new Date(l.expiresAt) > now,
     )
-    if (activeLeadLock && activeLeadLock.employeeId !== employeeId) {
-      return err(409, {
-        code: 'LEAD_LOCKED',
-        message: 'This lead is currently locked to another employee.',
-        details: { expiresAt: activeLeadLock.expiresAt },
-      })
-    }
-
-    // 4. Property lock conflict check (only if a specific plot was selected).
+    // Held by someone else is no longer an error: the visit is saved, with no lock and no opportunity.
+    const leadHeldUntil =
+      activeLeadLock && activeLeadLock.employeeId !== employeeId ? activeLeadLock.expiresAt : null
+    let propHeldUntil: string | null = null
     if (body.propertyId) {
       const activePropLock = db.propertyLocks.find(
         (p) => p.propertyId === body.propertyId && p.status === 'ACTIVE' && new Date(p.expiresAt) > now,
       )
-      if (activePropLock && activePropLock.employeeId !== employeeId) {
-        return err(409, {
-          code: 'PROPERTY_LOCKED',
-          message: 'This plot/property is currently locked to another employee.',
-          details: { expiresAt: activePropLock.expiresAt },
-        })
+      if (activePropLock && activePropLock.employeeId !== employeeId) propHeldUntil = activePropLock.expiresAt
+    }
+    if (leadHeldUntil || propHeldUntil) {
+      const heldVisit: SiteVisit = {
+        id: nextId('SV'),
+        employeeId,
+        leadId: lead.id,
+        projectId: body.projectId,
+        propertyId: body.propertyId,
+        visitAt: body.visitAt,
+        notes: body.notes,
+        outcome: body.outcome,
+        createdAt: new Date().toISOString(),
       }
+      db.siteVisits.push(heldVisit)
+      saveDb()
+      // Property held takes precedence: the customer joins that plot's waitlist.
+      return HttpResponse.json(
+        {
+          visit: heldVisit,
+          lead,
+          opportunity: null,
+          waitlisted: !!propHeldUntil,
+          lead_held: !propHeldUntil && !!leadHeldUntil,
+          held_until: propHeldUntil ?? leadHeldUntil,
+        },
+        { status: 200 },
+      )
     }
 
     // 5. Unified Opportunity conflict check (REQ-25 §16.6) — same engine as lock check above,

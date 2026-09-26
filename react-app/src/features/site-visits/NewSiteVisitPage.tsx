@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { createSiteVisit, type CreateSiteVisitInput } from '@/features/site-visits/api'
 import { fetchProjects, fetchProperties } from '@/features/properties/api'
@@ -16,6 +16,7 @@ import { InlineError } from '@/components/ui/States'
 import { ApiError } from '@/lib/api/client'
 import type { PropertyUnit } from '@/lib/types/domain'
 import { CONFLICT_MESSAGES } from '@/lib/constants'
+import { formatDateTime } from '@/lib/format'
 
 // The live API is in IST; build visit_at as one local value with the India offset
 // instead of converting to UTC, so a browser in another timezone can't shift the visit's date.
@@ -23,7 +24,8 @@ function toVisitAt(dateInput: string, timeInput: string): string {
   return `${dateInput}T${timeInput}:00+05:30`
 }
 
-// LOCKED (reserved) plots stay selectable — the API makes the final call and returns PROPERTY_LOCKED.
+// LOCKED (reserved) plots stay selectable — if another employee holds one, the visit is still saved
+// and the customer is waitlisted (waitlisted / lead_held flags on the response).
 const isBookable = (p: PropertyUnit) => p.availability !== 'SOLD' && p.availability !== 'DEAL_LOCKED'
 
 const schema = z.object({
@@ -38,7 +40,20 @@ const schema = z.object({
   outcome: z.string().optional(),
 })
 
+
 type FormValues = z.infer<typeof schema>
+
+// Single source of truth for the form's initial values, used by useForm and by "Log another visit".
+// Uses the browser's local date (toISOString would give the UTC date, which is the previous day
+// around midnight in IST).
+function defaultFormValues(): Partial<FormValues> {
+  const now = new Date()
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return {
+    visitDate: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+    visitTime: `${pad(now.getHours())}:${pad(now.getMinutes())}`,
+  }
+}
 
 const OUTCOMES = [
   { value: '', label: 'Select outcome (optional)' },
@@ -55,6 +70,8 @@ export default function NewSiteVisitPage() {
   const queryClient = useQueryClient()
   const employee = useAuthStore((s) => s.employee)
   const [conflict, setConflict] = useState<{ code: string; message: string } | null>(null)
+  // Set when the visit was saved but the plot/lead is held by another employee (a success, not an error).
+  const [heldResult, setHeldResult] = useState<{ kind: 'waitlisted' | 'leadHeld'; heldUntil: string | null } | null>(null)
   // Generated once when the form opens; reused on retry (e.g. CONCURRENT_UPDATE) so a resubmit
   // doesn't create a duplicate visit.
   const idempotencyKeyRef = useRef(crypto.randomUUID())
@@ -68,13 +85,11 @@ export default function NewSiteVisitPage() {
     watch,
     setError,
     setValue,
+    reset,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      visitDate: new Date().toISOString().slice(0, 10),
-      visitTime: new Date().toTimeString().slice(0, 5),
-    },
+    defaultValues: defaultFormValues(),
   })
 
   const projectId = watch('projectId')
@@ -97,6 +112,11 @@ export default function NewSiteVisitPage() {
       queryClient.invalidateQueries({ queryKey: ['leads'] })
       queryClient.invalidateQueries({ queryKey: ['site-visits'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      if (result.waitlisted || result.leadHeld) {
+        // No opportunity exists and the lead may belong to someone else, so stay here instead of opening the lead page.
+        setHeldResult({ kind: result.waitlisted ? 'waitlisted' : 'leadHeld', heldUntil: result.heldUntil })
+        return
+      }
       navigate(`/leads/${result.lead.id}`, { state: { justLogged: true } })
     },
     onError: (err) => {
@@ -111,6 +131,8 @@ export default function NewSiteVisitPage() {
       }
 
       if (err.code === 'VALIDATION_FAILED' && emailFieldError) return
+
+      // Fallback only: the backend no longer returns PROPERTY_LOCKED / LEAD_LOCKED for this call.
 
       setConflict({ code: err.code, message: CONFLICT_MESSAGES[err.code] ?? err.message })
     },
@@ -152,6 +174,44 @@ export default function NewSiteVisitPage() {
       outcome: (values.outcome || undefined) as CreateSiteVisitInput['outcome'],
       idempotencyKey: idempotencyKeyRef.current,
     })
+  }
+
+  if (heldResult) {
+    const isPlot = heldResult.kind === 'waitlisted'
+    return (
+      <div className="max-w-2xl">
+        <PageHeader title="Visit recorded" subtitle="Your site visit was saved." />
+        <Card>
+          <div className="rounded-md border border-status-info/30 bg-status-info-bg px-4 py-3 text-sm text-status-info">
+            {isPlot
+              ? 'This plot is currently held by another employee. Your customer has been added to the waitlist. You will be notified when it is available.'
+              : 'This customer is already being handled by another employee. Your visit was recorded.'}
+            {heldResult.heldUntil && (
+              <p className="mt-2">
+                {isPlot ? 'Earliest it can free up' : 'Current hold ends'}:{' '}
+                <span className="font-semibold">{formatDateTime(heldResult.heldUntil)}</span>
+              </p>
+            )}
+          </div>
+          <div className="mt-5 flex justify-end gap-3">
+            <Link to="/site-visits">
+              <Button variant="secondary">View site visits</Button>
+            </Link>
+            <Button
+              onClick={() => {
+                // Fresh key: this is a new visit, not a retry of the one just saved.
+                idempotencyKeyRef.current = crypto.randomUUID()
+                reset(defaultFormValues())
+                setHeldResult(null)
+                mutation.reset()
+              }}
+            >
+              Log another visit
+            </Button>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   return (
