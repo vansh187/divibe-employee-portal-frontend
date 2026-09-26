@@ -63,6 +63,7 @@ export interface Lead {
   email?: string
   source: 'EMPLOYEE_SITE_VISIT' | 'CHANNEL_PARTNER'
   originatingEmployeeId: string
+  originatingEmployeeName?: string
   currentEmployeeId?: string
   lifecycleStatus: 'NEW' | 'IN_PROGRESS' | 'CONVERTED' | 'LOST'
   firstVisitAt?: string

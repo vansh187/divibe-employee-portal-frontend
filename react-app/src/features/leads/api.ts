@@ -38,6 +38,8 @@ interface LiveLeadRaw {
   email?: string
   source: Lead['source']
   originating_employee_id?: string
+  originating_employee_name?: string
+  created_by_name?: string
   current_employee_id?: string
   lifecycle_status: Lead['lifecycleStatus']
   first_visit_at?: string
@@ -54,6 +56,7 @@ function adaptLiveLead(raw: LiveLeadRaw): Lead {
     email: raw.email,
     source: raw.source,
     originatingEmployeeId: raw.originating_employee_id ?? '',
+    originatingEmployeeName: raw.originating_employee_name ?? raw.created_by_name,
     currentEmployeeId: raw.current_employee_id,
     lifecycleStatus: raw.lifecycle_status,
     firstVisitAt: raw.first_visit_at,

@@ -12,6 +12,7 @@ import { Select } from '@/components/ui/Select'
 import { PageLoading, InlineError, EmptyState } from '@/components/ui/States'
 import { WidgetBoundary } from '@/components/errors/WidgetBoundary'
 import { formatDateTime, formatRemaining } from '@/lib/format'
+import { useAuthStore } from '@/features/auth/store'
 import { ApiError } from '@/lib/api/client'
 import type { FollowUpAction } from '@/lib/types/domain'
 
@@ -28,6 +29,7 @@ export default function LeadDetailPage() {
   const location = useLocation()
   const justLogged = (location.state as { justLogged?: boolean } | null)?.justLogged
   const queryClient = useQueryClient()
+  const me = useAuthStore((st) => st.employee)
   const [actionType, setActionType] = useState<FollowUpAction['actionType']>('CALL_LOGGED')
   const isQualifyingAction = FOLLOW_UP_OPTIONS.find((o) => o.value === actionType)?.qualifying ?? false
 
@@ -80,6 +82,10 @@ export default function LeadDetailPage() {
   if (!data) return null
 
   const { lead, visits, followUps, activeLock, opportunities } = data
+  // The API may not embed the creator's name; fall back to the signed-in employee when they created it.
+  const createdByName =
+    lead.originatingEmployeeName ??
+    (me && lead.originatingEmployeeId && me.id === lead.originatingEmployeeId ? `${me.name} (you)` : undefined)
 
   return (
     <div className="max-w-3xl">
@@ -111,6 +117,23 @@ export default function LeadDetailPage() {
             ) : (
               <p className="mt-2 text-sm text-ink-500">No active protection on this lead.</p>
             )}
+
+            <dl className="mt-4 space-y-3 border-t border-forest-800/10 pt-4 text-sm">
+              {[
+                ['Full name', lead.name],
+                ['Phone', lead.phone || lead.normalizedPhone],
+                ['Email', lead.email],
+                ['Created by', createdByName],
+                ['Source', lead.source ? lead.source.replace(/_/g, ' ').toLowerCase() : undefined],
+                ['First visit', lead.firstVisitAt ? formatDateTime(lead.firstVisitAt) : undefined],
+                ['Latest visit', lead.latestVisitAt ? formatDateTime(lead.latestVisitAt) : undefined],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</dt>
+                  <dd className="mt-0.5 break-words text-ink-900">{value || '—'}</dd>
+                </div>
+              ))}
+            </dl>
           </Card>
         </WidgetBoundary>
 
