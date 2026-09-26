@@ -318,15 +318,38 @@ export const handlers = [
     return HttpResponse.json(followUp, { status: 201 })
   }),
 
-  http.put(`${API}/opportunities/:opportunityId`, async ({ request, params }) => {
+  // Mirrors POST /api/v1/opportunities/:id/status on the live backend — only
+  // CONVERTED, LOST, RELEASED are settable; ACTIVE/EXPIRED/ATTRIBUTION_CONFLICT
+  // are backend-derived.
+  http.post(`${API}/opportunities/:opportunityId/status`, async ({ request, params }) => {
     await delay(LATENCY)
     const employeeId = requireAuth(request)
     if (!employeeId) return err(401, { code: 'UNAUTHORIZED', message: 'Not authenticated.' })
     const db = getDb()
     const opportunity = db.opportunities.find((o) => o.id === params.opportunityId)
     if (!opportunity) return err(404, { code: 'NOT_FOUND', message: 'Opportunity not found.' })
-    const body = (await request.json()) as { status: Opportunity['status'] }
-    opportunity.status = body.status
+
+    const body = (await request.json()) as { status?: string }
+    const allowed = ['CONVERTED', 'LOST', 'RELEASED']
+    if (!body.status || !allowed.includes(body.status)) {
+      return err(422, { code: 'VALIDATION_FAILED', message: `status must be one of ${allowed.join(', ')}.` })
+    }
+    if (opportunity.status !== 'ACTIVE') {
+      return err(409, {
+        code: 'OPPORTUNITY_NOT_ACTIVE',
+        message: `Opportunity is '${opportunity.status}'; only an ACTIVE opportunity can be updated.`,
+      })
+    }
+    if (body.status === 'CONVERTED' && opportunity.propertyId) {
+      const alreadySold = db.opportunities.some(
+        (o) => o.id !== opportunity.id && o.propertyId === opportunity.propertyId && o.status === 'CONVERTED',
+      )
+      if (alreadySold) return err(409, { code: 'DEAL_LOCKED', message: 'This plot already has an active deal.' })
+      const property = db.properties.find((p) => p.id === opportunity.propertyId)
+      if (property) property.availability = 'SOLD'
+    }
+
+    opportunity.status = body.status as Opportunity['status']
     saveDb()
     return HttpResponse.json(opportunity)
   }),

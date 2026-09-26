@@ -7,6 +7,7 @@ import type { FollowUpAction, Lead, LeadLock, Opportunity, Paginated, SiteVisit 
 
 interface LiveOpportunityRaw {
   id: string
+  lead_id?: string
   project_id: string
   property_id?: string | null
   source_owner_type: Opportunity['sourceOwnerType']
@@ -21,6 +22,10 @@ interface LiveOpportunityRaw {
   created_at: string
   updated_at: string
 }
+
+// Only these three can be set via POST /opportunities/{id}/status — the backend
+// derives ACTIVE, EXPIRED, and ATTRIBUTION_CONFLICT itself.
+export type SettableOpportunityStatus = 'CONVERTED' | 'LOST' | 'RELEASED'
 
 interface LiveLeadRaw {
   id: string
@@ -93,7 +98,7 @@ interface LiveFollowUpRaw {
 function adaptLiveOpportunity(raw: LiveOpportunityRaw): Opportunity {
   return {
     id: raw.id,
-    leadId: '',
+    leadId: raw.lead_id ?? '',
     projectId: raw.project_id,
     propertyId: raw.property_id || undefined,
     sourceOwnerType: raw.source_owner_type,
@@ -218,24 +223,24 @@ export function addFollowUp(
 
 function updateOpportunityStatusLive(
   opportunityId: string,
-  status: Opportunity['status'],
+  status: SettableOpportunityStatus,
 ): Promise<Opportunity> {
-  return liveFetch<Opportunity>(`/opportunities/${opportunityId}`, {
-    method: 'PUT',
+  return liveFetch<LiveOpportunityRaw>(`/opportunities/${opportunityId}/status`, {
+    method: 'POST',
     body: { status },
-  })
+  }).then(adaptLiveOpportunity)
 }
 
 function updateOpportunityStatusMock(
   opportunityId: string,
-  status: Opportunity['status'],
+  status: SettableOpportunityStatus,
 ): Promise<Opportunity> {
-  return apiFetch<Opportunity>(`/opportunities/${opportunityId}`, { method: 'PUT', body: { status } })
+  return apiFetch<Opportunity>(`/opportunities/${opportunityId}/status`, { method: 'POST', body: { status } })
 }
 
 export function updateOpportunityStatus(
   opportunityId: string,
-  status: Opportunity['status'],
+  status: SettableOpportunityStatus,
 ): Promise<Opportunity> {
   return API_MODE === 'live' ? updateOpportunityStatusLive(opportunityId, status) : updateOpportunityStatusMock(opportunityId, status)
 }
