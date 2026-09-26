@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { PageLoading, InlineError, EmptyState } from '@/components/ui/States'
 import { formatDateLong } from '@/lib/format'
 import { currentWeekDates, weekKeyFor } from '@/lib/week'
@@ -23,6 +24,7 @@ const STATUS_TONE: Record<DayOffStatus, 'success' | 'warning' | 'info' | 'neutra
 export default function DayOffCalendarPage() {
   const queryClient = useQueryClient()
   const [pendingDate, setPendingDate] = useState<string | null>(null)
+  const [confirmDate, setConfirmDate] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
 
   const { data, isLoading, error } = useQuery({ queryKey: ['day-off'], queryFn: fetchDayOffCalendar })
@@ -97,10 +99,8 @@ export default function DayOffCalendarPage() {
                     disabled={isPast || selectMutation.isPending}
                     onClick={() => {
                       if (API_MODE === 'live') {
-                        const confirmed = window.confirm(
-                          `Freeze ${formatDateLong(date)} as your Day Off for this week? This can't be undone from here.`,
-                        )
-                        if (!confirmed) return
+                        setConfirmDate(date)
+                        return
                       }
                       setPendingDate(date)
                       selectMutation.mutate(date)
@@ -144,6 +144,25 @@ export default function DayOffCalendarPage() {
           </ul>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={confirmDate !== null}
+        title="Freeze your Day Off?"
+        confirmLabel="Yes, freeze it"
+        isLoading={selectMutation.isPending}
+        onCancel={() => setConfirmDate(null)}
+        onConfirm={() => {
+          if (!confirmDate) return
+          setPendingDate(confirmDate)
+          selectMutation.mutate(confirmDate, { onSettled: () => setConfirmDate(null) })
+        }}
+      >
+        <p>
+          <span className="font-semibold">{confirmDate ? formatDateLong(confirmDate) : ''}</span> will become your Day Off for
+          this week.
+        </p>
+        <p className="mt-2 text-ink-500">This can't be undone from here, and site visits can't be logged on that date.</p>
+      </ConfirmDialog>
     </div>
   )
 }
