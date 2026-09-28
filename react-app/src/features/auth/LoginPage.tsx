@@ -14,7 +14,6 @@ import { ApiError } from '@/lib/api/client'
 const schema = z.object({
   email: z.string().min(1, 'Work email is required').email('Enter a valid email address'),
   password: z.string().min(1, 'Password is required'),
-  keepSignedIn: z.boolean().optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -104,11 +103,7 @@ export default function LoginPage() {
               {...register('password')}
             />
 
-            <div className="flex items-center justify-between text-sm">
-              <label className="flex items-center gap-2 text-ink-700">
-                <input type="checkbox" className="size-4 rounded border-forest-800/30" {...register('keepSignedIn')} />
-                Keep me signed in
-              </label>
+            <div className="flex justify-end text-sm">
               <Link to="/forgot-password" className="text-gold-600 hover:underline">
                 Forgot password
               </Link>
