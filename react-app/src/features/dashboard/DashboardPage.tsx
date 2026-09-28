@@ -26,7 +26,7 @@ function ms(expiresAt: string): number {
 
 function StatsRow({ data }: { data: DashboardData }) {
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
       <StatCard label="Visits Today" value={data.visitsToday} />
       <StatCard label="Active Locks" value={data.activeLocks} />
       <StatCard label="Conversions · Week" value={data.conversionsThisWeek} />
@@ -42,7 +42,7 @@ function StatsRow({ data }: { data: DashboardData }) {
 function LockedToYouPanel({ data }: { data: DashboardData }) {
   return (
     <Card>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <h2 className="font-display text-base text-ink-900">Locked to you</h2>
         <span className="text-xs text-ink-500">Auto-releases after 3 days of inaction</span>
       </div>
@@ -59,8 +59,8 @@ function LockedToYouPanel({ data }: { data: DashboardData }) {
                 {item.projectName?.slice(0, 2).toUpperCase() ?? '—'}
               </span>
               <div className="min-w-0 flex-1">
-                <Link to={`/leads/${item.leadId}`} className="truncate text-sm font-semibold text-ink-900 hover:underline">
-                  {item.leadName} {item.plotNo ? `· Plot ${item.plotNo}` : ''}
+                <Link to={`/leads/${item.leadId}`} className="block truncate text-sm font-semibold text-ink-900 hover:underline">
+                  {item.leadName} {item.plotNo ? `· Plot ${item.plotNo.replace(/^plot\s+/i, '')}` : ''}
                 </Link>
                 <p className="truncate text-xs text-ink-500">{item.projectName}</p>
               </div>
@@ -106,14 +106,14 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="font-display text-2xl text-ink-900">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4 sm:mb-8">
+        <div className="min-w-0">
+          <h1 className="break-words font-display text-2xl text-ink-900">
             {greeting()}, {firstName}
           </h1>
           <p className="mt-1 text-sm text-ink-500">{formatDateLong(today.toISOString())}</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <Link to="/attendance">
             <Button variant="secondary" size="sm">
               View Attendance
@@ -127,7 +127,7 @@ export default function DashboardPage() {
 
       {isLoading && (
         <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {Array.from({ length: 4 }).map((_, i) => (
               <SkeletonBlock key={i} className="h-24" />
             ))}

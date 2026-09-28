@@ -105,12 +105,12 @@ export default function LeadDetailPage() {
         </div>
       )}
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         <WidgetBoundary label="Lead & Property Lock">
           <Card>
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Lead &amp; Property Lock</p>
             {activeLock ? (
-              <div className="mt-2 flex items-center justify-between">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm text-ink-900">Locked to you</span>
                 <Badge tone="warning">{formatRemaining(activeLock.expiresAt)}</Badge>
               </div>
@@ -166,7 +166,7 @@ export default function LeadDetailPage() {
             <h2 className="font-display text-base text-ink-900">Log a follow-up</h2>
           </div>
           <div className="flex flex-wrap items-end gap-3">
-            <div className="min-w-[220px] flex-1">
+            <div className="w-full flex-1 sm:w-auto sm:min-w-[220px]">
               <Select
                 label="Action"
                 value={actionType}
@@ -179,7 +179,7 @@ export default function LeadDetailPage() {
                 ))}
               </Select>
             </div>
-            <Button onClick={() => mutation.mutate()} isLoading={mutation.isPending}>
+            <Button className="w-full sm:w-auto" onClick={() => mutation.mutate()} isLoading={mutation.isPending}>
               {isQualifyingAction ? 'Log & Renew Protection' : 'Log Note'}
             </Button>
           </div>
@@ -204,7 +204,7 @@ export default function LeadDetailPage() {
             {[...visits.map((v) => ({ type: 'visit' as const, at: v.visitAt, data: v })), ...followUps.map((f) => ({ type: 'followup' as const, at: f.loggedAt, data: f }))]
               .sort((a, b) => b.at.localeCompare(a.at))
               .map((item) => (
-                <li key={`${item.type}-${item.data.id}`} className="border-l-2 border-gold-400 pl-4">
+                <li key={`${item.type}-${item.data.id}`} className="break-words border-l-2 border-gold-400 pl-4">
                   <p className="text-xs text-ink-500">{formatDateTime(item.at)}</p>
                   {item.type === 'visit' ? (
                     <p className="text-sm text-ink-900">

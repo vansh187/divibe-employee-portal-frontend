@@ -34,9 +34,20 @@ export interface PendingSignup {
   createdAt: string
 }
 
+// Mock-only: an in-flight "forgot password" request. `resetToken` is issued once the
+// OTP is verified and must be presented to actually change the password.
+export interface PendingPasswordReset {
+  email: string
+  otp: string
+  otpExpiresAt: string
+  resetToken?: string
+  createdAt: string
+}
+
 export interface MockDb {
   employees: MockEmployee[]
   pendingSignups: PendingSignup[]
+  pendingPasswordResets: PendingPasswordReset[]
   projects: Project[]
   properties: PropertyUnit[]
   leads: Lead[]
@@ -241,6 +252,7 @@ export function buildSeed(): MockDb {
   return {
     employees,
     pendingSignups: [],
+    pendingPasswordResets: [],
     projects,
     properties,
     leads,

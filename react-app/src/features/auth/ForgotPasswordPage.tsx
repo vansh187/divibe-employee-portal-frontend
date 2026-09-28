@@ -1,23 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
-import { signup, verifySignupOtp, resendSignupOtp, type SignupInput } from '@/features/auth/api'
+import { requestPasswordReset, resetPassword, verifyPasswordResetOtp } from '@/features/auth/api'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { InlineError } from '@/components/ui/States'
 import { ApiError } from '@/lib/api/client'
 
-const detailsSchema = z
+const emailSchema = z.object({
+  email: z.string().min(1, 'Work email is required').email('Enter a valid email address'),
+})
+
+type EmailValues = z.infer<typeof emailSchema>
+
+const otpSchema = z.object({
+  otp: z.string().length(6, 'Enter the 6-digit code'),
+})
+
+type OtpValues = z.infer<typeof otpSchema>
+
+const passwordSchema = z
   .object({
-    name: z.string().min(1, 'Full name is required').max(200, 'Name is too long'),
-    email: z.string().min(1, 'Work email is required').email('Enter a valid email address'),
-    employeeId: z
-      .string()
-      .min(1, 'Employee ID is required')
-      .max(50, 'Employee ID is too long')
-      .regex(/^[A-Za-z0-9][A-Za-z0-9._/-]*$/, 'Use letters, numbers and . _ / - only'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string().min(1, 'Confirm your password'),
   })
@@ -26,71 +31,68 @@ const detailsSchema = z
     message: 'Passwords do not match',
   })
 
-type DetailsValues = z.infer<typeof detailsSchema>
-
-const otpSchema = z.object({
-  otp: z.string().length(6, 'Enter the 6-digit code'),
-})
-
-type OtpValues = z.infer<typeof otpSchema>
+type PasswordValues = z.infer<typeof passwordSchema>
 
 const RESEND_COOLDOWN_SECONDS = 30
 
-export default function SignupPage() {
+export default function ForgotPasswordPage() {
   const navigate = useNavigate()
-  const [step, setStep] = useState<'details' | 'otp'>('details')
+  const [step, setStep] = useState<'email' | 'otp' | 'password'>('email')
   const [formError, setFormError] = useState<string | null>(null)
   const [pendingEmail, setPendingEmail] = useState('')
   const [devOtp, setDevOtp] = useState<string | null>(null)
+  const [resetToken, setResetToken] = useState('')
   const [resendCooldown, setResendCooldown] = useState(0)
   const [resending, setResending] = useState(false)
 
-  const detailsForm = useForm<DetailsValues>({ resolver: zodResolver(detailsSchema) })
+  const emailForm = useForm<EmailValues>({ resolver: zodResolver(emailSchema) })
   const otpForm = useForm<OtpValues>({ resolver: zodResolver(otpSchema) })
+  const passwordForm = useForm<PasswordValues>({ resolver: zodResolver(passwordSchema) })
 
-  const startCooldown = () => {
-    setResendCooldown(RESEND_COOLDOWN_SECONDS)
-    const timer = setInterval(() => {
-      setResendCooldown((s) => {
-        if (s <= 1) {
-          clearInterval(timer)
-          return 0
-        }
-        return s - 1
-      })
-    }, 1000)
-  }
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const timer = setTimeout(() => setResendCooldown((s) => Math.max(0, s - 1)), 1000)
+    return () => clearTimeout(timer)
+  }, [resendCooldown])
 
-  const onSubmitDetails = async (values: DetailsValues) => {
+  const startCooldown = () => setResendCooldown(RESEND_COOLDOWN_SECONDS)
+
+  const onSubmitEmail = async (values: EmailValues) => {
     setFormError(null)
-    const input: SignupInput = {
-      name: values.name,
-      email: values.email,
-      employeeId: values.employeeId,
-      password: values.password,
-    }
     try {
-      const res = await signup(input)
-      setPendingEmail(res.email)
+      const res = await requestPasswordReset(values.email.trim())
+      setPendingEmail(res.email ?? values.email.trim())
       setDevOtp(res.devOtp ?? null)
+      otpForm.reset()
       startCooldown()
       setStep('otp')
     } catch (err) {
-      if (err instanceof ApiError && err.fields?.length) {
-        setFormError(err.fields.map((f) => f.message).join(' '))
-      } else {
-        setFormError(err instanceof ApiError ? err.message : 'Unable to sign up right now. Please try again.')
-      }
+      setFormError(err instanceof ApiError ? err.message : 'Unable to send a reset code right now. Please try again.')
     }
   }
 
   const onSubmitOtp = async (values: OtpValues) => {
     setFormError(null)
     try {
-      await verifySignupOtp({ email: pendingEmail, otp: values.otp })
-      navigate('/login', { replace: true, state: { signupVerified: true } })
+      const token = await verifyPasswordResetOtp({ email: pendingEmail, otp: values.otp.trim() })
+      setResetToken(token)
+      setStep('password')
     } catch (err) {
       setFormError(err instanceof ApiError ? err.message : 'Unable to verify this code right now. Please try again.')
+    }
+  }
+
+  const onSubmitPassword = async (values: PasswordValues) => {
+    setFormError(null)
+    try {
+      await resetPassword({ resetToken, password: values.password })
+      navigate('/login', { replace: true, state: { passwordReset: true } })
+    } catch (err) {
+      if (err instanceof ApiError && err.fields?.length) {
+        setFormError(err.fields.map((f) => f.message).join(' '))
+      } else {
+        setFormError(err instanceof ApiError ? err.message : 'Unable to update your password right now. Please try again.')
+      }
     }
   }
 
@@ -98,7 +100,7 @@ export default function SignupPage() {
     setFormError(null)
     setResending(true)
     try {
-      const res = await resendSignupOtp(pendingEmail)
+      const res = await requestPasswordReset(pendingEmail)
       setDevOtp(res.devOtp ?? null)
       startCooldown()
     } catch (err) {
@@ -106,6 +108,12 @@ export default function SignupPage() {
     } finally {
       setResending(false)
     }
+  }
+
+  const goToEmailStep = () => {
+    setFormError(null)
+    setDevOtp(null)
+    setStep('email')
   }
 
   return (
@@ -127,60 +135,36 @@ export default function SignupPage() {
 
       <main className="flex items-start justify-center bg-cream-100 px-4 py-8 sm:px-6 md:items-center md:py-12">
         <div className="w-full max-w-sm">
-          {step === 'details' ? (
+          {step === 'email' && (
             <>
-              <h2 className="font-display text-2xl text-ink-900">Create your account</h2>
-              <p className="mt-1 text-sm text-ink-500">We'll email you a code to verify it's really you.</p>
+              <h2 className="font-display text-2xl text-ink-900">Reset your password</h2>
+              <p className="mt-1 text-sm text-ink-500">Enter your work email and we'll send you a 6-digit code.</p>
 
-              <form className="mt-8 flex flex-col gap-5" onSubmit={detailsForm.handleSubmit(onSubmitDetails)} noValidate>
+              <form className="mt-8 flex flex-col gap-5" onSubmit={emailForm.handleSubmit(onSubmitEmail)} noValidate>
                 {formError && <InlineError message={formError} />}
 
-                <Input
-                  label="Full name"
-                  autoComplete="name"
-                  error={detailsForm.formState.errors.name?.message}
-                  {...detailsForm.register('name')}
-                />
                 <Input
                   label="Work email"
                   type="email"
                   placeholder="firstname@divinevisioninfra.com"
                   autoComplete="username"
-                  error={detailsForm.formState.errors.email?.message}
-                  {...detailsForm.register('email')}
-                />
-                <Input
-                  label="Employee ID"
-                  placeholder="DVI-1234"
-                  error={detailsForm.formState.errors.employeeId?.message}
-                  {...detailsForm.register('employeeId')}
-                />
-                <Input
-                  label="Password"
-                  type="password"
-                  placeholder="At least 8 characters"
-                  autoComplete="new-password"
-                  error={detailsForm.formState.errors.password?.message}
-                  {...detailsForm.register('password')}
-                />
-                <Input
-                  label="Confirm password"
-                  type="password"
-                  autoComplete="new-password"
-                  error={detailsForm.formState.errors.confirmPassword?.message}
-                  {...detailsForm.register('confirmPassword')}
+                  error={emailForm.formState.errors.email?.message}
+                  {...emailForm.register('email')}
                 />
 
-                <Button type="submit" isLoading={detailsForm.formState.isSubmitting} className="w-full">
-                  Send verification code
+                <Button type="submit" isLoading={emailForm.formState.isSubmitting} className="w-full">
+                  Send reset code
                 </Button>
               </form>
             </>
-          ) : (
+          )}
+
+          {step === 'otp' && (
             <>
-              <h2 className="font-display text-2xl text-ink-900">Verify your email</h2>
+              <h2 className="font-display text-2xl text-ink-900">Check your email</h2>
               <p className="mt-1 text-sm text-ink-500">
-                Enter the 6-digit code we sent to <span className="font-semibold text-ink-900">{pendingEmail}</span>.
+                If an account exists for <span className="font-semibold text-ink-900">{pendingEmail}</span>, we've sent
+                a 6-digit code to it.
               </p>
 
               {devOtp && (
@@ -196,6 +180,7 @@ export default function SignupPage() {
                 <Input
                   label="Verification code"
                   inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={6}
                   placeholder="000000"
                   error={otpForm.formState.errors.otp?.message}
@@ -203,7 +188,7 @@ export default function SignupPage() {
                 />
 
                 <Button type="submit" isLoading={otpForm.formState.isSubmitting} className="w-full">
-                  Verify email
+                  Verify code
                 </Button>
 
                 <button
@@ -215,13 +200,42 @@ export default function SignupPage() {
                   {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setStep('details')}
-                  className="text-center text-xs text-ink-500 hover:underline"
-                >
-                  Back to details
+                <button type="button" onClick={goToEmailStep} className="text-center text-xs text-ink-500 hover:underline">
+                  Use a different email
                 </button>
+              </form>
+            </>
+          )}
+
+          {step === 'password' && (
+            <>
+              <h2 className="font-display text-2xl text-ink-900">Choose a new password</h2>
+              <p className="mt-1 text-sm text-ink-500">
+                Code verified for <span className="font-semibold text-ink-900">{pendingEmail}</span>.
+              </p>
+
+              <form className="mt-8 flex flex-col gap-5" onSubmit={passwordForm.handleSubmit(onSubmitPassword)} noValidate>
+                {formError && <InlineError message={formError} />}
+
+                <Input
+                  label="New password"
+                  type="password"
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  error={passwordForm.formState.errors.password?.message}
+                  {...passwordForm.register('password')}
+                />
+                <Input
+                  label="Confirm new password"
+                  type="password"
+                  autoComplete="new-password"
+                  error={passwordForm.formState.errors.confirmPassword?.message}
+                  {...passwordForm.register('confirmPassword')}
+                />
+
+                <Button type="submit" isLoading={passwordForm.formState.isSubmitting} className="w-full">
+                  Update password
+                </Button>
               </form>
             </>
           )}
@@ -233,9 +247,9 @@ export default function SignupPage() {
           </div>
 
           <p className="text-center text-sm text-ink-500">
-            Already have an account?{' '}
+            Remembered it?{' '}
             <Link to="/login" className="text-gold-600 hover:underline">
-              Sign in
+              Back to sign in
             </Link>
           </p>
         </div>

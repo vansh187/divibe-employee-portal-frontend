@@ -50,8 +50,8 @@ export default function PropertyListPage() {
         {!isLoading && data && data.length > 0 && (
           <ul className="flex flex-col divide-y divide-forest-800/8">
             {data.map((unit) => (
-              <li key={unit.id} className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
+              <li key={unit.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="font-mono text-sm text-ink-900">{unit.code}</span>
                   {unit.availability === 'AVAILABLE' && (
                     <Link

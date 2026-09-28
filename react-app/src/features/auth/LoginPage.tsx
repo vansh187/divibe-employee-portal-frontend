@@ -22,7 +22,9 @@ type FormValues = z.infer<typeof schema>
 export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const signupVerified = (useLocation().state as { signupVerified?: boolean } | null)?.signupVerified
+  const locationState = useLocation().state as { signupVerified?: boolean; passwordReset?: boolean } | null
+  const signupVerified = locationState?.signupVerified
+  const passwordReset = locationState?.passwordReset
   const signIn = useAuthStore((s) => s.signIn)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -46,14 +48,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="grid min-h-screen w-full grid-cols-1 md:grid-cols-2">
-      <aside className="flex flex-col justify-between bg-forest-800 px-10 py-12 text-cream-100 md:px-14">
+    <div className="grid min-h-screen w-full grid-cols-1 grid-rows-[auto_1fr] md:grid-cols-2 md:grid-rows-1">
+      <aside className="flex flex-col justify-between bg-forest-800 px-6 py-5 text-cream-100 md:px-14 md:py-12">
         <div>
           <p className="font-display text-lg font-semibold tracking-wide text-gold-400">DIVINE VISION INFRATECH</p>
           <p className="mt-1 text-xs uppercase tracking-[0.2em] text-cream-100/70">Field &amp; Site Operations</p>
         </div>
 
-        <div className="max-w-md">
+        <div className="hidden max-w-md md:block">
           <h1 className="font-display text-4xl leading-tight text-cream-50 md:text-5xl">
             Every site visit, held to one standard.
           </h1>
@@ -64,10 +66,10 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-xs text-cream-100/50">est. 2005 · Karnal, Ganaur, Kurukshetra</p>
+        <p className="hidden text-xs text-cream-100/50 md:block">est. 2005 · Karnal, Ganaur, Kurukshetra</p>
       </aside>
 
-      <main className="flex items-center justify-center bg-cream-100 px-6 py-12">
+      <main className="flex items-start justify-center bg-cream-100 px-4 py-8 sm:px-6 md:items-center md:py-12">
         <div className="w-full max-w-sm">
           <h2 className="font-display text-2xl text-ink-900">Employee sign in</h2>
           <p className="mt-1 text-sm text-ink-500">Access site visits, attendance and your weekly Day Off.</p>
@@ -76,6 +78,11 @@ export default function LoginPage() {
             {signupVerified && (
               <div className="rounded-md border border-status-success/30 bg-status-success-bg px-4 py-3 text-sm text-status-success">
                 Email verified. Sign in with your new account.
+              </div>
+            )}
+            {passwordReset && (
+              <div className="rounded-md border border-status-success/30 bg-status-success-bg px-4 py-3 text-sm text-status-success">
+                Password updated. Sign in with your new password.
               </div>
             )}
             {formError && <InlineError message={formError} />}
@@ -102,9 +109,9 @@ export default function LoginPage() {
                 <input type="checkbox" className="size-4 rounded border-forest-800/30" {...register('keepSignedIn')} />
                 Keep me signed in
               </label>
-              <a href="#" className="text-gold-600 hover:underline">
+              <Link to="/forgot-password" className="text-gold-600 hover:underline">
                 Forgot password
-              </a>
+              </Link>
             </div>
 
             <Button type="submit" isLoading={isSubmitting} className="w-full">

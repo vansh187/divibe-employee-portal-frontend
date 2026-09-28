@@ -65,7 +65,7 @@ export default function DayOffCalendarPage() {
       <PageHeader title="Weekly Day Off" subtitle="Select and freeze one Day Off per week. A frozen Day Off blocks site visits for that date." />
 
       <Card className="mb-6">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="font-display text-base text-ink-900">This week</h2>
           {thisWeekRecord && <Badge tone={STATUS_TONE[thisWeekRecord.status]}>{DAY_OFF_STATUS_LABEL[thisWeekRecord.status]}</Badge>}
         </div>
@@ -136,7 +136,7 @@ export default function DayOffCalendarPage() {
         ) : (
           <ul className="flex flex-col divide-y divide-forest-800/8">
             {history.map((d) => (
-              <li key={d.weekKey} className="flex items-center justify-between py-3">
+              <li key={d.weekKey} className="flex items-center justify-between gap-3 py-3">
                 <span className="text-sm text-ink-900">{formatDateLong(d.dayOffDate)}</span>
                 <Badge tone={STATUS_TONE[d.status]}>{DAY_OFF_STATUS_LABEL[d.status]}</Badge>
               </li>
