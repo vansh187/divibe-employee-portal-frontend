@@ -54,7 +54,7 @@ export function ConfirmDialog({
           {title}
         </h2>
         <div className="mt-2 text-sm text-ink-700">{children}</div>
-        <div className="mt-6 flex justify-end gap-2">
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
           <Button ref={cancelRef} variant="secondary" onClick={onCancel} disabled={isLoading}>
             {cancelLabel}
           </Button>

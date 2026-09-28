@@ -193,7 +193,7 @@ export default function NewSiteVisitPage() {
               </p>
             )}
           </div>
-          <div className="mt-5 flex justify-end gap-3">
+          <div className="mt-5 flex flex-wrap justify-end gap-3">
             <Link to="/site-visits">
               <Button variant="secondary">View site visits</Button>
             </Link>
@@ -219,7 +219,7 @@ export default function NewSiteVisitPage() {
       <PageHeader title="Log a Site Visit" subtitle="Every submission creates or updates a Lead automatically." />
 
       <Card>
-        <div className="mb-5 flex items-center gap-2 text-sm text-ink-500">
+        <div className="mb-5 flex flex-wrap items-center gap-2 text-sm text-ink-500">
           <span className="rounded-full bg-forest-800/8 px-2.5 py-1 font-mono text-xs text-forest-800">
             {employee?.avatarInitials}
           </span>
@@ -308,7 +308,7 @@ export default function NewSiteVisitPage() {
             <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Notes</label>
             <textarea
               rows={3}
-              className="rounded-md border border-forest-800/15 bg-white px-3.5 py-2.5 text-sm text-ink-900 focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/60"
+              className="rounded-md border border-forest-800/15 bg-white px-3.5 py-2.5 text-base text-ink-900 sm:text-sm focus:border-gold-500 focus:outline-none focus:ring-2 focus:ring-gold-500/60"
               {...register('notes')}
             />
           </div>

@@ -65,7 +65,7 @@ function CheckInOutCard() {
           </p>
         )}
       </div>
-      <div className="flex gap-3">
+      <div className="flex w-full gap-3 sm:w-auto [&>*]:flex-1 sm:[&>*]:flex-none">
         <Button
           variant="secondary"
           disabled={!!todayRecord?.checkInAt}
@@ -119,8 +119,8 @@ export default function AttendancePage() {
         {!isLoading && data && data.items.length > 0 && (
           <ul className="flex flex-col divide-y divide-forest-800/8">
             {data.items.map((rec) => (
-              <li key={rec.id} className="flex items-center justify-between py-3">
-                <div>
+              <li key={rec.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
                   <p className="text-sm font-semibold text-ink-900">{formatDateLong(rec.workDate)}</p>
                   <p className="text-xs text-ink-500">
                     {rec.checkInAt ? formatTime(rec.checkInAt) : '—'}

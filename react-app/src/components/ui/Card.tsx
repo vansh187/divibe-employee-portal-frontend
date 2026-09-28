@@ -4,7 +4,7 @@ import { clsx } from 'clsx'
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={clsx('rounded-xl border border-forest-800/10 bg-white p-5 shadow-sm', className)}
+      className={clsx('min-w-0 rounded-xl border border-forest-800/10 bg-white p-4 shadow-sm sm:p-5', className)}
       {...props}
     />
   )
@@ -22,7 +22,7 @@ export function StatCard({
   return (
     <Card className="flex flex-col gap-2">
       <span className="text-xs font-semibold uppercase tracking-wide text-ink-500">{label}</span>
-      <span className="font-display text-3xl text-forest-800">
+      <span className="break-words font-display text-2xl text-forest-800 sm:text-3xl">
         {value}
         {suffix && <span className="ml-1 font-sans text-sm font-medium text-ink-500">{suffix}</span>}
       </span>

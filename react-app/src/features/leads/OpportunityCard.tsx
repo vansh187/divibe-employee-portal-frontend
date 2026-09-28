@@ -110,7 +110,7 @@ function OpportunityCardInner({ opportunity, onSubmitStatus, isLoading, justUpda
     <div className="rounded-md border border-forest-800/10 bg-forest-800/2 p-3">
       <div className="flex flex-col gap-3 text-sm">
         <div className="flex items-start justify-between gap-2">
-          <div>
+          <div className="min-w-0 break-words">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Project</p>
             <p className="mt-1 font-medium text-ink-900">{projectName ?? '—'}</p>
             <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-ink-500">Plot</p>
@@ -124,7 +124,7 @@ function OpportunityCardInner({ opportunity, onSubmitStatus, isLoading, justUpda
         {canChangeStatus ? (
           <div className="border-t border-forest-800/10 pt-3">
             <label className="text-xs font-semibold uppercase tracking-wide text-ink-500">Change Status</label>
-            <div className="mt-2 flex items-center gap-2">
+            <div className="mt-2 flex items-center gap-2 [&>:first-child]:flex-1">
               <Select
                 value={selectedStatus}
                 onChange={(e) => setPickedStatus(e.target.value as SettableOpportunityStatus)}

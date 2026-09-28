@@ -9,7 +9,7 @@ function BarChart({ data, title }: { data: BarDatum[]; title: string }) {
   const total = data.reduce((sum, d) => sum + d.count, 0)
   return (
     <div role="img" aria-label={`${title}: ${data.map((d) => `${d.label} ${d.count}`).join(', ')}`}>
-      <div className="flex h-40 items-end gap-2">
+      <div className="flex h-40 items-end gap-1 sm:gap-2">
         {data.map((d, i) => (
           <div key={`${d.label}-${i}`} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end gap-1">
             <span className="text-xs font-medium text-ink-700">{d.count > 0 ? d.count : ''}</span>
@@ -21,11 +21,11 @@ function BarChart({ data, title }: { data: BarDatum[]; title: string }) {
           </div>
         ))}
       </div>
-      <div className="mt-2 flex gap-2 border-t border-forest-800/10 pt-2">
+      <div className="mt-2 flex gap-1 border-t border-forest-800/10 pt-2 sm:gap-2">
         {data.map((d, i) => (
           <div key={`${d.label}-${i}`} className="min-w-0 flex-1 text-center">
-            <p className={`truncate text-xs ${d.isCurrent ? 'font-semibold text-ink-900' : 'text-ink-500'}`}>{d.label}</p>
-            {d.sublabel && <p className="text-[10px] text-ink-500">{d.sublabel}</p>}
+            <p className={`break-words text-[11px] leading-tight sm:truncate sm:text-xs ${d.isCurrent ? 'font-semibold text-ink-900' : 'text-ink-500'}`}>{d.label}</p>
+            {d.sublabel && <p className="truncate text-[10px] text-ink-500">{d.sublabel}</p>}
           </div>
         ))}
       </div>
@@ -57,9 +57,9 @@ export function VisitCharts() {
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <Card>
-        <div className="mb-4 flex items-baseline justify-between gap-2">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
           <h2 className="font-display text-base text-ink-900">Visits this week</h2>
-          <span className="flex items-baseline gap-2 text-sm text-ink-700">
+          <span className="flex flex-wrap items-baseline gap-x-2 text-sm text-ink-700">
             <span className="font-semibold">{data.thisWeekTotal}</span> total
             <Trend current={data.thisWeekTotal} previous={data.lastWeekTotal} />
           </span>
@@ -68,7 +68,7 @@ export function VisitCharts() {
       </Card>
 
       <Card>
-        <div className="mb-4 flex items-baseline justify-between gap-2">
+        <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
           <h2 className="font-display text-base text-ink-900">Weekly trend</h2>
           <span className="text-sm text-ink-700">
             <span className="font-semibold">{data.eightWeekTotal}</span> in last 8 weeks

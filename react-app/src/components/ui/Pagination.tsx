@@ -15,7 +15,7 @@ export function Pagination({
   if (totalPages <= 1) return null
 
   return (
-    <div className="mt-4 flex items-center justify-between text-sm text-ink-500">
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-500">
       <span>
         Page {page} of {totalPages} · {total} total
       </span>

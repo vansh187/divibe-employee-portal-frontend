@@ -88,7 +88,7 @@ export default function NotificationsPage() {
           <ul className="flex flex-col divide-y divide-forest-800/8">
             {data.items.map((n) => (
               <li key={n.id} className="flex items-start justify-between gap-3 py-3">
-                <div className="min-w-0">
+                <div className="min-w-0 break-words">
                   <div className="mb-1">
                     <Badge tone={eventMeta(n.eventType).tone}>{eventMeta(n.eventType).label}</Badge>
                   </div>
@@ -102,6 +102,7 @@ export default function NotificationsPage() {
                 </div>
                 {!n.readAt && (
                   <Button
+                    className="shrink-0"
                     variant="ghost"
                     size="sm"
                     isLoading={markReadMutation.isPending && markReadMutation.variables === n.id}

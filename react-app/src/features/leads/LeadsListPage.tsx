@@ -31,7 +31,7 @@ export default function LeadsListPage() {
     <div>
       <PageHeader title="Leads" subtitle="Leads created or updated from your site visits." />
 
-      <div className="mb-4 max-w-sm">
+      <div className="mb-4 w-full sm:max-w-sm">
         <Input
           placeholder="Search by name or phone…"
           value={search}
