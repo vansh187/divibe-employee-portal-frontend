@@ -158,6 +158,76 @@ export const handlers = [
     return HttpResponse.json({ accessToken, refreshToken, employee })
   }),
 
+  // ---------- Forgot password (email OTP → reset token → new password) ----------
+  // Always 200 so the form can't be used to probe which emails have accounts;
+  // an OTP is only generated (and echoed as devOtp) when the account exists.
+  http.post(`${API}/auth/forgot-password`, async ({ request }) => {
+    await delay(LATENCY)
+    const body = (await request.json()) as { email: string }
+    const db = getDb()
+    const email = body.email?.trim().toLowerCase()
+    if (!email) return err(422, { code: 'VALIDATION_FAILED', message: 'Work email is required.' })
+
+    db.pendingPasswordResets = db.pendingPasswordResets.filter((p) => p.email !== email)
+    const employee = db.employees.find((e) => e.email.toLowerCase() === email)
+    if (!employee) {
+      saveDb()
+      return HttpResponse.json({ email })
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000))
+    const expiresAt = new Date()
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10)
+    db.pendingPasswordResets.push({
+      email,
+      otp,
+      otpExpiresAt: expiresAt.toISOString(),
+      createdAt: new Date().toISOString(),
+    })
+    saveDb()
+
+    // eslint-disable-next-line no-console
+    console.info(`[mock] Password reset OTP for ${email}: ${otp}`)
+    return HttpResponse.json({ email, devOtp: otp, expiresAt: expiresAt.toISOString() })
+  }),
+
+  http.post(`${API}/auth/forgot-password/verify-otp`, async ({ request }) => {
+    await delay(LATENCY)
+    const body = (await request.json()) as { email: string; otp: string }
+    const db = getDb()
+    const email = body.email?.trim().toLowerCase()
+    const pending = db.pendingPasswordResets.find((p) => p.email === email)
+    if (!pending || pending.otp !== body.otp?.trim()) {
+      return err(422, { code: 'INVALID_OTP', message: 'That code is incorrect. Please check and try again.' })
+    }
+    if (new Date(pending.otpExpiresAt) < new Date()) {
+      return err(410, { code: 'OTP_EXPIRED', message: 'This code has expired. Request a new one.' })
+    }
+
+    pending.resetToken = `mock-reset-${nextId('R')}`
+    saveDb()
+    return HttpResponse.json({ resetToken: pending.resetToken })
+  }),
+
+  http.post(`${API}/auth/reset-password`, async ({ request }) => {
+    await delay(LATENCY)
+    const body = (await request.json()) as { resetToken: string; password: string }
+    const db = getDb()
+    if (!body.password || body.password.length < 8) {
+      return err(422, { code: 'VALIDATION_FAILED', message: 'Password must be at least 8 characters.' })
+    }
+    const pending = body.resetToken ? db.pendingPasswordResets.find((p) => p.resetToken === body.resetToken) : undefined
+    const employee = pending && db.employees.find((e) => e.email.toLowerCase() === pending.email)
+    if (!pending || !employee) {
+      return err(410, { code: 'RESET_EXPIRED', message: 'This reset session has expired. Start again.' })
+    }
+
+    employee.password = body.password
+    db.pendingPasswordResets = db.pendingPasswordResets.filter((p) => p !== pending)
+    saveDb()
+    return HttpResponse.json({ ok: true })
+  }),
+
   http.post(`${API}/auth/refresh`, async ({ request }) => {
     await delay(150)
     const body = (await request.json()) as { refreshToken: string }

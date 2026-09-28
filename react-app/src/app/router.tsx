@@ -5,6 +5,7 @@ import NotFoundPage from '@/components/ui/NotFoundPage'
 import AppShell from '@/layouts/AppShell'
 import LoginPage from '@/features/auth/LoginPage'
 import SignupPage from '@/features/auth/SignupPage'
+import ForgotPasswordPage from '@/features/auth/ForgotPasswordPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import LeadsListPage from '@/features/leads/LeadsListPage'
 import LeadDetailPage from '@/features/leads/LeadDetailPage'
@@ -25,6 +26,11 @@ export const router = createBrowserRouter([
   {
     path: '/signup',
     element: <SignupPage />,
+    errorElement: <RouteErrorBoundary />,
+  },
+  {
+    path: '/forgot-password',
+    element: <ForgotPasswordPage />,
     errorElement: <RouteErrorBoundary />,
   },
   {

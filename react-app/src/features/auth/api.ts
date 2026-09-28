@@ -134,6 +134,56 @@ export function resendSignupOtp(email: string): Promise<SignupStartResult> {
   return apiFetch<SignupStartResult>('/auth/signup/resend-otp', { method: 'POST', body: { email }, skipAuth: true })
 }
 
+export interface ForgotPasswordStartResult {
+  email: string
+  /** Mock mode only — the real backend emails the OTP instead of returning it. */
+  devOtp?: string
+}
+
+// NOTE: like signup, the forgot-password routes aren't in the live API guide yet.
+// Assumed contract (confirm with the backend team):
+//   POST /auth/forgot-password            { email }                     → { email }      (emails a 6-digit OTP)
+//   POST /auth/forgot-password/verify-otp { email, otp }                → { reset_token }
+//   POST /auth/reset-password             { reset_token, new_password } → { ok }
+/** Emails a 6-digit reset code. Also used to resend it — a new call replaces the previous code. */
+export function requestPasswordReset(email: string): Promise<ForgotPasswordStartResult> {
+  if (API_MODE === 'live') {
+    return liveFetch<{ email: string }>('/auth/forgot-password', { method: 'POST', skipAuth: true, body: { email } })
+  }
+  return apiFetch<ForgotPasswordStartResult>('/auth/forgot-password', { method: 'POST', body: { email }, skipAuth: true })
+}
+
+/** Verifies the emailed code and returns a short-lived token that authorises the password change. */
+export async function verifyPasswordResetOtp(input: { email: string; otp: string }): Promise<string> {
+  if (API_MODE === 'live') {
+    const data = await liveFetch<{ reset_token: string }>('/auth/forgot-password/verify-otp', {
+      method: 'POST',
+      skipAuth: true,
+      body: { email: input.email, otp: input.otp },
+    })
+    return data.reset_token
+  }
+  const data = await apiFetch<{ resetToken: string }>('/auth/forgot-password/verify-otp', {
+    method: 'POST',
+    body: input,
+    skipAuth: true,
+  })
+  return data.resetToken
+}
+
+/** Sets the new password. Does not sign the user in — they log in afterwards. */
+export async function resetPassword(input: { resetToken: string; password: string }): Promise<void> {
+  if (API_MODE === 'live') {
+    await liveFetch<unknown>('/auth/reset-password', {
+      method: 'POST',
+      skipAuth: true,
+      body: { reset_token: input.resetToken, new_password: input.password },
+    })
+    return
+  }
+  await apiFetch<{ ok: boolean }>('/auth/reset-password', { method: 'POST', body: input, skipAuth: true })
+}
+
 /** Exchanges the persisted refresh token for a fresh access token during app bootstrap. */
 export async function restoreSession(): Promise<Employee | null> {
   const refreshToken = useAuthStore.getState().refreshToken
