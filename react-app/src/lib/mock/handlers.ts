@@ -18,6 +18,11 @@ import type {
 
 const API = '/api'
 const LATENCY = 350
+const WORK_EMAIL_DOMAIN = 'divinevisioninfra.com'
+
+function isAllowedWorkEmail(email: string | undefined): boolean {
+  return !!email && email.trim().toLowerCase().endsWith(`@${WORK_EMAIL_DOMAIN}`)
+}
 
 function err(status: number, body: ApiErrorBody) {
   return HttpResponse.json(body, { status })
@@ -50,6 +55,9 @@ export const handlers = [
   http.post(`${API}/auth/login`, async ({ request }) => {
     await delay(LATENCY)
     const body = (await request.json()) as { email: string; password: string }
+    if (!isAllowedWorkEmail(body.email)) {
+      return err(403, { code: 'FORBIDDEN', message: `Only @${WORK_EMAIL_DOMAIN} work email addresses can sign in.` })
+    }
     const db = getDb()
     const employee = db.employees.find((e) => e.email.toLowerCase() === body.email?.toLowerCase())
     // Seeded demo accounts have a password on record but accept any non-empty value;
@@ -69,6 +77,10 @@ export const handlers = [
     const body = (await request.json()) as { name: string; email: string; employeeId: string; password: string }
     const db = getDb()
     const email = body.email?.trim().toLowerCase()
+
+    if (!isAllowedWorkEmail(email)) {
+      return err(422, { code: 'VALIDATION_FAILED', message: `Use your @${WORK_EMAIL_DOMAIN} work email to create an account.` })
+    }
 
     if (!body.name?.trim() || !email || !body.employeeId?.trim() || !body.password || body.password.length < 8) {
       return err(422, { code: 'VALIDATION_FAILED', message: 'Please fill in every field. Password must be at least 8 characters.' })

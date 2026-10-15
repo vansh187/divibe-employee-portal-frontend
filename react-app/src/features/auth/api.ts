@@ -1,9 +1,18 @@
-import { apiFetch } from '@/lib/api/client'
+import { ApiError, apiFetch } from '@/lib/api/client'
 import { liveFetch } from '@/lib/api/liveClient'
 import { API_MODE } from '@/lib/apiMode'
 import { useAuthStore } from '@/features/auth/store'
 import { initialsFromName } from '@/lib/initials'
 import type { Employee } from '@/lib/types/domain'
+import { isAllowedWorkEmail, WORK_EMAIL_ERROR } from '@/features/auth/emailPolicy'
+
+function requireWorkEmail(email: string): string {
+  const normalized = email.trim().toLowerCase()
+  if (!isAllowedWorkEmail(normalized)) {
+    throw new ApiError(422, { code: 'VALIDATION_FAILED', message: WORK_EMAIL_ERROR })
+  }
+  return normalized
+}
 
 export interface LoginResponse {
   accessToken: string
@@ -54,11 +63,16 @@ async function loginLive(email: string, password: string): Promise<LoginResponse
   // fresh access token directly (the auth store isn't populated yet at this point).
   useAuthStore.getState().setAccessToken(tokens.access_token)
   const raw = await liveFetch<LiveEmployeeRaw>('/auth/me')
+  if (!isAllowedWorkEmail(raw.email)) {
+    useAuthStore.getState().signOutLocally()
+    throw new ApiError(403, { code: 'FORBIDDEN', message: WORK_EMAIL_ERROR })
+  }
   return { accessToken: tokens.access_token, refreshToken: tokens.refresh_token, employee: adaptLiveEmployee(raw) }
 }
 
 export function login(email: string, password: string): Promise<LoginResponse> {
-  return API_MODE === 'live' ? loginLive(email, password) : loginMock(email, password)
+  const workEmail = requireWorkEmail(email)
+  return API_MODE === 'live' ? loginLive(workEmail, password) : loginMock(workEmail, password)
 }
 
 export async function fetchMe(): Promise<Employee> {
@@ -106,7 +120,9 @@ async function signupMock(input: SignupInput): Promise<SignupStartResult> {
 }
 
 export function signup(input: SignupInput): Promise<SignupStartResult> {
-  return API_MODE === 'live' ? signupLive(input) : signupMock(input)
+  const workEmail = requireWorkEmail(input.email)
+  const workInput = { ...input, email: workEmail }
+  return API_MODE === 'live' ? signupLive(workInput) : signupMock(workInput)
 }
 
 export interface VerifySignupOtpInput {

@@ -10,9 +10,10 @@ import { Button } from '@/components/ui/Button'
 import { InlineError } from '@/components/ui/States'
 import { REDIRECT_QUERY_PARAM } from '@/lib/constants'
 import { ApiError } from '@/lib/api/client'
+import { workEmailSchema } from '@/features/auth/emailPolicy'
 
 const schema = z.object({
-  email: z.string().min(1, 'Work email is required').email('Enter a valid email address'),
+  email: workEmailSchema,
   password: z.string().min(1, 'Password is required'),
 })
 
