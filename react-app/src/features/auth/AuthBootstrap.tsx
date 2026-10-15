@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useAuthStore } from '@/features/auth/store'
 import { restoreSession } from '@/features/auth/api'
 import { PageLoading } from '@/components/ui/States'
+import { isAllowedWorkEmail } from '@/features/auth/emailPolicy'
 
 /**
  * Runs once on app mount: attempts to silently restore the session from the
@@ -27,7 +28,7 @@ export function AuthBootstrap({ children }: { children: ReactNode }) {
     if (!persisted) return
 
     restoreSession().then((employee) => {
-      if (employee) confirmRestored(employee)
+      if (employee && isAllowedWorkEmail(employee.email)) confirmRestored(employee)
       else signOutLocally()
     })
   }, [hydrateFromStorage, confirmRestored, signOutLocally])

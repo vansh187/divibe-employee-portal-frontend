@@ -8,11 +8,12 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { InlineError } from '@/components/ui/States'
 import { ApiError } from '@/lib/api/client'
+import { workEmailSchema } from '@/features/auth/emailPolicy'
 
 const detailsSchema = z
   .object({
     name: z.string().min(1, 'Full name is required').max(200, 'Name is too long'),
-    email: z.string().min(1, 'Work email is required').email('Enter a valid email address'),
+    email: workEmailSchema,
     employeeId: z
       .string()
       .min(1, 'Employee ID is required')
